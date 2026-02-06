@@ -17,7 +17,7 @@ composer require admin9/laravel-oidc-server
 Publish the config (optional):
 
 ```bash
-php artisan vendor:publish --tag=oidc-config
+php artisan vendor:publish --tag=oidc-server-config
 ```
 
 ## Setup
@@ -65,7 +65,45 @@ php artisan passport:keys
 
 ## Configuration
 
-See `config/oidc.php` for all options including scopes, token TTLs, claims resolvers, route middleware, and Passport auto-configuration.
+Publish the config file and see `config/oidc.php` for all options. Key configuration sections:
+
+### User Model
+
+By default the package uses `config('auth.providers.users.model')` to look up users when generating ID tokens. Override with:
+
+```php
+'user_model' => \App\Models\User::class,
+```
+
+### Passport Route Control
+
+The package calls `Passport::ignoreRoutes()` by default to prevent route conflicts. Disable if you need Passport's default routes alongside OIDC:
+
+```php
+'ignore_passport_routes' => false,
+```
+
+### Default Claims Map
+
+The `HasOidcClaims` trait resolves standard claims via a configurable map. Override to match your User model's schema:
+
+```php
+'default_claims_map' => [
+    'name' => 'name',           // string = model attribute
+    'email' => 'email',
+    'email_verified' => fn ($user) => $user->email_verified_at !== null,
+    'updated_at' => fn ($user) => $user->updated_at?->timestamp,
+],
+```
+
+For custom claims (e.g. `nickname`, `picture`), use `claims_resolver` or override `resolveOidcClaim()` in your User model.
+
+### Other Options
+
+- **Scopes & claims mapping** — `scopes`, `claims_resolver`
+- **Token TTLs** — `tokens.access_token_ttl`, `tokens.refresh_token_ttl`, `tokens.id_token_ttl`
+- **Route middleware** — `routes.discovery_middleware`, `routes.token_middleware`, `routes.userinfo_middleware`
+- **Passport auto-configuration** — `configure_passport` (set `false` to configure Passport yourself)
 
 ## License
 
