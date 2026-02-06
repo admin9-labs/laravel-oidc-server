@@ -1,0 +1,43 @@
+{
+    "name": "admin9/laravel-oidc-server",
+    "description": "OpenID Connect Server for Laravel Passport — adds OIDC Discovery, JWKS, UserInfo, Token Introspection, Token Revocation, and RP-Initiated Logout.",
+    "keywords": ["laravel", "passport", "oidc", "openid-connect", "oauth2"],
+    "license": "MIT",
+    "type": "library",
+    "require": {
+        "php": "^8.2",
+        "laravel/passport": "^12.0|^13.0",
+        "lcobucci/jwt": "^5.0",
+        "spatie/laravel-package-tools": "^1.16"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^9.0|^10.0",
+        "pestphp/pest": "^3.0",
+        "phpunit/phpunit": "^11.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Admin9\\OidcServer\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Admin9\\OidcServer\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Admin9\\OidcServer\\OidcServerServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
