@@ -10,6 +10,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | User Model
+    |--------------------------------------------------------------------------
+    |
+    | The Eloquent model class used to look up users when generating ID tokens.
+    | Falls back to the default auth provider model if not set.
+    |
+    */
+    'user_model' => null,
+
+    /*
+    |--------------------------------------------------------------------------
     | Passport Auto-Configuration
     |--------------------------------------------------------------------------
     |
@@ -19,6 +30,18 @@ return [
     |
     */
     'configure_passport' => true,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Ignore Passport Routes
+    |--------------------------------------------------------------------------
+    |
+    | When true, the package will call Passport::ignoreRoutes() to prevent
+    | Passport from registering its own routes. Set to false if you need
+    | Passport's default routes alongside the OIDC routes.
+    |
+    */
+    'ignore_passport_routes' => true,
 
     /*
     |--------------------------------------------------------------------------
@@ -80,6 +103,23 @@ return [
     |
     */
     'claims_resolver' => [],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Default Claims Map
+    |--------------------------------------------------------------------------
+    |
+    | Map claim names to model attributes or callables for the default
+    | resolution in HasOidcClaims. These are used when no claims_resolver
+    | entry exists for a claim. Override to match your User model's schema.
+    |
+    */
+    'default_claims_map' => [
+        'name' => 'name',
+        'email' => 'email',
+        'email_verified' => fn ($user) => $user->email_verified_at !== null,
+        'updated_at' => fn ($user) => $user->updated_at?->timestamp,
+    ],
 
     /*
     |--------------------------------------------------------------------------

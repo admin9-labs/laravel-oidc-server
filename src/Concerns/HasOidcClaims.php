@@ -61,14 +61,25 @@ trait HasOidcClaims
             }
         }
 
-        // Default claim resolution
-        return match ($claim) {
-            'sub' => $this->getOidcSubject(),
-            'name' => $this->name,
-            'email' => $this->email,
-            'email_verified' => $this->email_verified_at !== null,
-            'updated_at' => $this->updated_at?->timestamp,
-            default => null,
-        };
+        // Default claim resolution via config map
+        if ($claim === 'sub') {
+            return $this->getOidcSubject();
+        }
+
+        $defaultMap = config('oidc.default_claims_map', []);
+        if (isset($defaultMap[$claim])) {
+            $mapper = $defaultMap[$claim];
+
+            if (is_callable($mapper)) {
+                return $mapper($this);
+            }
+
+            // String = model attribute name
+            if (is_string($mapper)) {
+                return $this->{$mapper};
+            }
+        }
+
+        return null;
     }
 }

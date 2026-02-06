@@ -31,7 +31,9 @@ class OidcServerServiceProvider extends PackageServiceProvider
     public function packageBooted(): void
     {
         // Prevent Passport from registering its own routes
-        Passport::ignoreRoutes();
+        if (config('oidc.ignore_passport_routes', true)) {
+            Passport::ignoreRoutes();
+        }
 
         if (config('oidc.configure_passport', true)) {
             $this->configurePassport();

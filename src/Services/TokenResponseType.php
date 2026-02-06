@@ -28,7 +28,7 @@ class TokenResponseType extends BearerTokenResponse
             return [];
         }
 
-        $userModel = config('auth.providers.users.model');
+        $userModel = config('oidc.user_model', config('auth.providers.users.model'));
         $user = $userModel::find($accessToken->getUserIdentifier());
 
         if (! $user || ! $user instanceof OidcUserInterface) {
