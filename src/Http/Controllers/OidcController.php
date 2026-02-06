@@ -3,6 +3,8 @@
 namespace Admin9\OidcServer\Http\Controllers;
 
 use Admin9\OidcServer\Contracts\OidcUserInterface;
+use Admin9\OidcServer\Events\OidcLogoutInitiated;
+use Admin9\OidcServer\Events\OidcUserInfoRequested;
 use Admin9\OidcServer\Services\ClaimsService;
 use Defuse\Crypto\Crypto;
 use Illuminate\Http\JsonResponse;
@@ -27,7 +29,7 @@ class OidcController extends Controller
      */
     public function discovery(): JsonResponse
     {
-        $issuer = rtrim(config('oidc.issuer'), '/');
+        $issuer = rtrim(config('oidc-server.issuer'), '/');
 
         $discovery = [
             'issuer' => $issuer,
@@ -38,17 +40,17 @@ class OidcController extends Controller
             'end_session_endpoint' => $issuer.'/oauth/logout',
             'introspection_endpoint' => $issuer.'/oauth/introspect',
             'revocation_endpoint' => $issuer.'/oauth/revoke',
-            'post_logout_redirect_uris_supported' => config('oidc.post_logout_redirect_uris_supported'),
-            'response_types_supported' => config('oidc.response_types_supported'),
-            'subject_types_supported' => config('oidc.subject_types_supported'),
-            'id_token_signing_alg_values_supported' => config('oidc.id_token_signing_alg_values_supported'),
-            'scopes_supported' => array_keys(config('oidc.scopes')),
-            'token_endpoint_auth_methods_supported' => config('oidc.token_endpoint_auth_methods_supported'),
+            'post_logout_redirect_uris_supported' => config('oidc-server.post_logout_redirect_uris_supported'),
+            'response_types_supported' => config('oidc-server.response_types_supported'),
+            'subject_types_supported' => config('oidc-server.subject_types_supported'),
+            'id_token_signing_alg_values_supported' => config('oidc-server.id_token_signing_alg_values_supported'),
+            'scopes_supported' => array_keys(config('oidc-server.scopes')),
+            'token_endpoint_auth_methods_supported' => config('oidc-server.token_endpoint_auth_methods_supported'),
             'claims_supported' => $this->claimsService->getSupportedClaims(),
-            'code_challenge_methods_supported' => config('oidc.code_challenge_methods_supported'),
-            'grant_types_supported' => config('oidc.grant_types_supported'),
-            'introspection_endpoint_auth_methods_supported' => config('oidc.token_endpoint_auth_methods_supported'),
-            'revocation_endpoint_auth_methods_supported' => config('oidc.token_endpoint_auth_methods_supported'),
+            'code_challenge_methods_supported' => config('oidc-server.code_challenge_methods_supported'),
+            'grant_types_supported' => config('oidc-server.grant_types_supported'),
+            'introspection_endpoint_auth_methods_supported' => config('oidc-server.token_endpoint_auth_methods_supported'),
+            'revocation_endpoint_auth_methods_supported' => config('oidc-server.token_endpoint_auth_methods_supported'),
         ];
 
         return response()->json($discovery)
@@ -117,6 +119,8 @@ class OidcController extends Controller
         $token = $user->token();
         $scopes = $token ? ($token->scopes ?? ['openid']) : ['openid'];
 
+        OidcUserInfoRequested::dispatch($user->getKey(), $scopes);
+
         if ($user instanceof OidcUserInterface) {
             $claims = $this->claimsService->resolveForUser($user, $scopes);
         } else {
@@ -144,6 +148,13 @@ class OidcController extends Controller
 
         $token = $request->input('token');
         $tokenTypeHint = $request->input('token_type_hint', 'access_token');
+
+        if ($tokenTypeHint && ! in_array($tokenTypeHint, ['access_token', 'refresh_token'], true)) {
+            return response()->json([
+                'error' => 'unsupported_token_type',
+                'error_description' => 'token_type_hint must be access_token or refresh_token.',
+            ], 400);
+        }
 
         if (! $token) {
             return response()->json(['active' => false]);
@@ -178,6 +189,13 @@ class OidcController extends Controller
         $token = $request->input('token');
         $tokenTypeHint = $request->input('token_type_hint', 'access_token');
 
+        if ($tokenTypeHint && ! in_array($tokenTypeHint, ['access_token', 'refresh_token'], true)) {
+            return response()->json([
+                'error' => 'unsupported_token_type',
+                'error_description' => 'token_type_hint must be access_token or refresh_token.',
+            ], 400);
+        }
+
         if (! $token) {
             return response()->json([], 200);
         }
@@ -200,6 +218,10 @@ class OidcController extends Controller
 
         $client = null;
         if ($idTokenHint) {
+            // Security note: We parse the id_token_hint WITHOUT signature verification.
+            // This is intentional per the OIDC RP-Initiated Logout spec — the hint is only
+            // used to identify the client for redirect URI validation, not for authentication.
+            // The actual security boundary is the post_logout_redirect_uri validation below.
             try {
                 $parser = new \Lcobucci\JWT\Token\Parser(new \Lcobucci\JWT\Encoding\JoseEncoder);
                 /** @var \Lcobucci\JWT\Token\Plain $token */
@@ -212,6 +234,11 @@ class OidcController extends Controller
             } catch (\Exception $e) {
             }
         }
+
+        OidcLogoutInitiated::dispatch(
+            auth()->guard('web')->id(),
+            $client?->id,
+        );
 
         auth()->guard('web')->logout();
         $request->session()->invalidate();
@@ -297,7 +324,7 @@ class OidcController extends Controller
                         'iat' => $accessToken->created_at->timestamp,
                         'sub' => (string) $accessToken->user_id,
                         'aud' => $accessToken->client_id,
-                        'iss' => config('oidc.issuer', config('app.url')),
+                        'iss' => config('oidc-server.issuer', config('app.url')),
                     ];
                 }
             }

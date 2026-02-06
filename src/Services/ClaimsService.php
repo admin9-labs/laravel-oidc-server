@@ -30,7 +30,7 @@ class ClaimsService
     {
         $claims = ['sub', 'iss', 'aud', 'exp', 'iat', 'auth_time'];
 
-        foreach (config('oidc.scopes') as $scope) {
+        foreach (config('oidc-server.scopes') as $scope) {
             if (isset($scope['claims'])) {
                 $claims = array_merge($claims, $scope['claims']);
             }

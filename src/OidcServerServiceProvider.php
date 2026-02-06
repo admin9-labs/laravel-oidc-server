@@ -17,7 +17,7 @@ class OidcServerServiceProvider extends PackageServiceProvider
     {
         $package
             ->name('oidc-server')
-            ->hasConfigFile('oidc')
+            ->hasConfigFile('oidc-server')
             ->hasViews('oidc-server');
     }
 
@@ -31,15 +31,15 @@ class OidcServerServiceProvider extends PackageServiceProvider
     public function packageBooted(): void
     {
         // Prevent Passport from registering its own routes
-        if (config('oidc.ignore_passport_routes', true)) {
+        if (config('oidc-server.ignore_passport_routes', true)) {
             Passport::ignoreRoutes();
         }
 
-        if (config('oidc.configure_passport', true)) {
+        if (config('oidc-server.configure_passport', true)) {
             $this->configurePassport();
         }
 
-        if (config('oidc.routes.enabled', true)) {
+        if (config('oidc-server.routes.enabled', true)) {
             $this->registerRoutes();
         }
     }
@@ -47,33 +47,33 @@ class OidcServerServiceProvider extends PackageServiceProvider
     protected function configurePassport(): void
     {
         // Authorization view
-        Passport::authorizationView(config('oidc.authorization_view', 'oidc-server::authorize'));
+        Passport::authorizationView(config('oidc-server.authorization_view', 'oidc-server::authorize'));
 
         // Client model
-        $clientModel = config('oidc.client_model');
+        $clientModel = config('oidc-server.client_model');
         if ($clientModel) {
             Passport::useClientModel($clientModel);
         }
 
         // Scopes from config
         $scopes = [];
-        foreach (config('oidc.scopes', []) as $key => $scope) {
+        foreach (config('oidc-server.scopes', []) as $key => $scope) {
             $scopes[$key] = $scope['description'] ?? $key;
         }
         Passport::tokensCan($scopes);
 
         // Default scopes
-        Passport::defaultScopes(config('oidc.default_scopes', ['openid']));
+        Passport::defaultScopes(config('oidc-server.default_scopes', ['openid']));
 
         // Token lifetimes
         Passport::tokensExpireIn(
-            CarbonInterval::seconds(config('oidc.tokens.access_token_ttl', 900))
+            CarbonInterval::seconds(config('oidc-server.tokens.access_token_ttl', 900))
         );
         Passport::refreshTokensExpireIn(
-            CarbonInterval::seconds(config('oidc.tokens.refresh_token_ttl', 604800))
+            CarbonInterval::seconds(config('oidc-server.tokens.refresh_token_ttl', 604800))
         );
         Passport::personalAccessTokensExpireIn(
-            CarbonInterval::seconds(config('oidc.tokens.access_token_ttl', 900))
+            CarbonInterval::seconds(config('oidc-server.tokens.access_token_ttl', 900))
         );
 
         // Custom token response type with id_token injection

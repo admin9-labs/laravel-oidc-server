@@ -13,9 +13,9 @@ use Laravel\Passport\Http\Controllers\DenyAuthorizationController;
 |--------------------------------------------------------------------------
 */
 
-$discoveryMiddleware = config('oidc.routes.discovery_middleware', []);
-$tokenMiddleware = config('oidc.routes.token_middleware', []);
-$userinfoMiddleware = config('oidc.routes.userinfo_middleware', ['auth:api']);
+$discoveryMiddleware = config('oidc-server.routes.discovery_middleware', []);
+$tokenMiddleware = config('oidc-server.routes.token_middleware', []);
+$userinfoMiddleware = config('oidc-server.routes.userinfo_middleware', ['auth:api']);
 
 // Discovery & JWKS (public)
 Route::middleware($discoveryMiddleware)->group(function () {

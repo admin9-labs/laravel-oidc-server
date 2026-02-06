@@ -21,7 +21,7 @@ trait HasOidcClaims
     public function getOidcClaims(array $scopes): array
     {
         $claims = [];
-        $scopeConfig = config('oidc.scopes');
+        $scopeConfig = config('oidc-server.scopes');
 
         foreach ($scopes as $scope) {
             if (! isset($scopeConfig[$scope])) {
@@ -47,7 +47,7 @@ trait HasOidcClaims
     protected function resolveOidcClaim(string $claim): mixed
     {
         // Check config-based claims_resolver first
-        $resolvers = config('oidc.claims_resolver', []);
+        $resolvers = config('oidc-server.claims_resolver', []);
         if (isset($resolvers[$claim])) {
             $resolver = $resolvers[$claim];
 
@@ -66,7 +66,7 @@ trait HasOidcClaims
             return $this->getOidcSubject();
         }
 
-        $defaultMap = config('oidc.default_claims_map', []);
+        $defaultMap = config('oidc-server.default_claims_map', []);
         if (isset($defaultMap[$claim])) {
             $mapper = $defaultMap[$claim];
 

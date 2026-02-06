@@ -3,6 +3,7 @@
 namespace Admin9\OidcServer\Services;
 
 use Admin9\OidcServer\Contracts\OidcUserInterface;
+use Admin9\OidcServer\Events\OidcTokenIssued;
 use League\OAuth2\Server\Entities\AccessTokenEntityInterface;
 use League\OAuth2\Server\ResponseTypes\BearerTokenResponse;
 
@@ -28,14 +29,14 @@ class TokenResponseType extends BearerTokenResponse
             return [];
         }
 
-        $userModel = config('oidc.user_model', config('auth.providers.users.model'));
+        $userModel = config('oidc-server.user_model', config('auth.providers.users.model'));
         $user = $userModel::find($accessToken->getUserIdentifier());
 
         if (! $user || ! $user instanceof OidcUserInterface) {
             return [];
         }
 
-        $nonce = request()->input('nonce');
+        $nonce = $this->resolveNonce();
 
         $idToken = $this->idTokenService->generateToken(
             $accessToken,
@@ -44,8 +45,19 @@ class TokenResponseType extends BearerTokenResponse
             $nonce
         );
 
+        OidcTokenIssued::dispatch($user->getKey(), $accessToken->getClient()->getIdentifier(), $scopes);
+
         return [
             'id_token' => $idToken,
         ];
+    }
+
+    /**
+     * Resolve the nonce from the current request.
+     * Override this method to resolve the nonce from a different source.
+     */
+    protected function resolveNonce(): ?string
+    {
+        return request()->input('nonce');
     }
 }

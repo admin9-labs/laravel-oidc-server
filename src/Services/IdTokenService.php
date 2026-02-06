@@ -43,7 +43,7 @@ class IdTokenService
         ClientEntityInterface $client,
         ?string $nonce = null
     ): string {
-        $issuer = config('oidc.issuer', config('app.url'));
+        $issuer = config('oidc-server.issuer', config('app.url'));
         $now = new \DateTimeImmutable;
         $jwtConfig = $this->getJwtConfig();
 

@@ -113,6 +113,10 @@ return [
     | resolution in HasOidcClaims. These are used when no claims_resolver
     | entry exists for a claim. Override to match your User model's schema.
     |
+    | String values are treated as model attribute names (e.g., 'name' => 'name').
+    | Callables receive the user model as the first argument:
+    |   'email_verified' => fn($user) => $user->email_verified_at !== null
+    |
     */
     'default_claims_map' => [
         'name' => 'name',
@@ -203,6 +207,13 @@ return [
     |--------------------------------------------------------------------------
     | Routes Configuration
     |--------------------------------------------------------------------------
+    |
+    | Control route registration and per-group middleware.
+    | - discovery_middleware: Applied to /.well-known/* endpoints
+    | - token_middleware: Applied to /oauth/token, introspect, revoke, logout
+    | - userinfo_middleware: Applied to /oauth/userinfo (default: auth:api,
+    |   which requires a valid Passport access token)
+    |
     */
     'routes' => [
         'enabled' => true,
