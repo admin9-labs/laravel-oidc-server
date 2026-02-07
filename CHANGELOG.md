@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-02-07
+
+### Added
+- Complete Chinese translation of all documentation in `docs/zh-CN/`
+- Language switcher in root README.md for easy navigation between English and Chinese docs
+
+### Changed
+- Improved quick start guide with clearer step-by-step instructions
+- Enhanced documentation consistency across all files
+- Standardized document introductions and link formats
+- Added installation verification URL in README
+
 ## [1.1.0] - 2026-02-07
 
 ### Added
