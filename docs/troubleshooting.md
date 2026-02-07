@@ -67,8 +67,8 @@ class User extends Authenticatable implements OidcUserInterface
 
 **Check**:
 1. The URI must match a registered redirect URI for the client (scheme + host + port)
-2. Configure allowed URIs: `config/oidc-server.php` → `post_logout_redirect_uris_supported`
-3. Provide `id_token_hint` so the server can identify the client
+2. Provide `id_token_hint` so the server can identify the client and validate against its registered redirect URIs
+3. Without `id_token_hint`, only URIs matching `config('app.url')` are allowed
 
 ## Passport Routes Conflict
 

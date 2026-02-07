@@ -151,7 +151,7 @@ All values are in **seconds**.
 
 - `access_token_ttl` -- Lifetime of access tokens. Default: 900 (15 minutes).
 - `refresh_token_ttl` -- Lifetime of refresh tokens. Default: 604800 (7 days).
-- `id_token_ttl` -- Lifetime of ID tokens. Default: 900 (15 minutes).
+- `id_token_ttl` -- Reserved for future use. Currently the ID token expiry follows the access token TTL.
 
 ---
 
@@ -241,7 +241,7 @@ Allowed redirect URIs after logout. Empty by default; add URIs as needed.
 
 - `enabled` -- Set to `false` to disable all routes registered by the package.
 - `discovery_middleware` -- Middleware applied to the `/.well-known/openid-configuration` and JWKS endpoints.
-- `token_middleware` -- Middleware applied to the token endpoint.
+- `token_middleware` -- Middleware applied to the `/oauth/token`, `/oauth/introspect`, `/oauth/revoke`, and `/oauth/logout` endpoints.
 - `userinfo_middleware` -- Middleware applied to the userinfo endpoint. Defaults to `auth:api`.
 
 ---
@@ -253,4 +253,4 @@ Allowed redirect URIs after logout. Empty by default; add URIs as needed.
 | `OIDC_ISSUER` | `issuer` | `string` | `APP_URL` | OpenID Connect Issuer Identifier |
 | `OIDC_ACCESS_TOKEN_TTL` | `tokens.access_token_ttl` | `int` | `900` | Access token lifetime in seconds |
 | `OIDC_REFRESH_TOKEN_TTL` | `tokens.refresh_token_ttl` | `int` | `604800` | Refresh token lifetime in seconds |
-| `OIDC_ID_TOKEN_TTL` | `tokens.id_token_ttl` | `int` | `900` | ID token lifetime in seconds |
+| `OIDC_ID_TOKEN_TTL` | `tokens.id_token_ttl` | `int` | `900` | Reserved for future use |

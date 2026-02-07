@@ -89,7 +89,7 @@ JWT configuration is lazy-loaded (initialized on first use, not at boot time).
 | `aud` | Client ID | Audience |
 | `sub` | `$user->getOidcSubject()` | Subject identifier |
 | `iat` | Current time | Issued at |
-| `exp` | Token TTL | Expiration |
+| `exp` | Access token expiry | Expiration |
 | `auth_time` | Current timestamp | Authentication time |
 | `nonce` | Request parameter | Replay protection |
 
