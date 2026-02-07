@@ -13,7 +13,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Log;
 use Laravel\Passport\Client;
 use Laravel\Passport\RefreshToken;
 use Laravel\Passport\Token;
@@ -180,8 +179,6 @@ class OidcController extends Controller
     {
         $client = $this->authenticateClient($request);
         if (! $client) {
-            Log::warning('OIDC: Revoke client authentication failed');
-
             return response()->json([
                 'error' => 'invalid_client',
                 'error_description' => 'Client authentication failed.',
@@ -366,7 +363,6 @@ class OidcController extends Controller
             if ($tokenId) {
                 $refreshToken = RefreshToken::where('id', $tokenId)->first();
                 if ($refreshToken && $refreshToken->accessToken?->client_id === $client->id) {
-                    Log::info('OIDC: Revoking refresh token and its access token', ['id' => $tokenId]);
                     $refreshToken->update(['revoked' => true]);
                     $refreshToken->accessToken?->revoke();
                     $revoked = true;
@@ -382,7 +378,6 @@ class OidcController extends Controller
                     ->first();
 
                 if ($accessToken) {
-                    Log::info('OIDC: Revoking access token and its refresh tokens', ['id' => $tokenId]);
                     $accessToken->revoke();
                     RefreshToken::where('access_token_id', $accessToken->id)
                         ->update(['revoked' => true]);
@@ -391,9 +386,6 @@ class OidcController extends Controller
             }
         }
 
-        if (! $revoked) {
-            Log::info('OIDC: No token found to revoke with provided credentials/hint');
-        }
     }
 
     protected function extractAccessTokenId(string $token): ?string
@@ -409,8 +401,6 @@ class OidcController extends Controller
 
             return $token;
         } catch (\Exception $e) {
-            Log::error('OIDC: Failed to parse access token', ['error' => $e->getMessage()]);
-
             return null;
         }
     }
@@ -431,11 +421,6 @@ class OidcController extends Controller
             if (strlen($token) === 80 && ! str_contains($token, '.')) {
                 return $token;
             }
-
-            Log::error('OIDC: Failed to decrypt refresh token', [
-                'error' => $e->getMessage(),
-                'token_preview' => substr($token, 0, 5).'...',
-            ]);
 
             return null;
         }
