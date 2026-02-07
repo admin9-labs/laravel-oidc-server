@@ -49,7 +49,7 @@ class ClaimsResolutionTest extends TestCase
     public function test_has_oidc_claims_trait_resolves_default_claims(): void
     {
         config([
-            'oidc.default_claims_map' => [
+            'oidc-server.default_claims_map' => [
                 'name' => 'name',
                 'email' => 'email',
             ],
@@ -69,10 +69,10 @@ class ClaimsResolutionTest extends TestCase
     public function test_has_oidc_claims_trait_uses_claims_resolver(): void
     {
         config([
-            'oidc.claims_resolver' => [
+            'oidc-server.claims_resolver' => [
                 'name' => fn ($user) => strtoupper($user->name),
             ],
-            'oidc.default_claims_map' => [
+            'oidc-server.default_claims_map' => [
                 'name' => 'name',
             ],
         ]);
@@ -90,14 +90,14 @@ class ClaimsResolutionTest extends TestCase
     public function test_has_oidc_claims_trait_returns_null_for_unknown_claims(): void
     {
         config([
-            'oidc.scopes' => [
+            'oidc-server.scopes' => [
                 'custom' => [
                     'description' => 'Custom scope',
                     'claims' => ['nonexistent_claim'],
                 ],
             ],
-            'oidc.claims_resolver' => [],
-            'oidc.default_claims_map' => [],
+            'oidc-server.claims_resolver' => [],
+            'oidc-server.default_claims_map' => [],
         ]);
 
         $user = new TestUser;
@@ -118,14 +118,4 @@ class TestUser extends \Illuminate\Foundation\Auth\User implements \Admin9\OidcS
     use \Admin9\OidcServer\Concerns\HasOidcClaims;
 
     protected $guarded = [];
-
-    public $id;
-
-    public $name;
-
-    public $email;
-
-    public $email_verified_at;
-
-    public $updated_at;
 }

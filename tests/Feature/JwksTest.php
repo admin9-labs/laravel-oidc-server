@@ -8,11 +8,25 @@ class JwksTest extends TestCase
 {
     public function test_jwks_endpoint_returns_error_when_no_key(): void
     {
-        $response = $this->getJson('/.well-known/jwks.json');
+        $publicKeyPath = storage_path('oauth-public.key');
+        $backupPath = $publicKeyPath.'.bak';
+        $existed = file_exists($publicKeyPath);
 
-        // Without oauth keys generated, should return 500
-        $response->assertStatus(500);
-        $response->assertJsonStructure(['error', 'error_description']);
+        if ($existed) {
+            rename($publicKeyPath, $backupPath);
+        }
+
+        try {
+            $response = $this->getJson('/.well-known/jwks.json');
+
+            // Without oauth keys generated, should return 500
+            $response->assertStatus(500);
+            $response->assertJsonStructure(['error', 'error_description']);
+        } finally {
+            if ($existed) {
+                rename($backupPath, $publicKeyPath);
+            }
+        }
     }
 
     public function test_jwks_endpoint_returns_keys_when_key_exists(): void

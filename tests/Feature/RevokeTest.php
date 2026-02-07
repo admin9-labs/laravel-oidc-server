@@ -3,29 +3,27 @@
 namespace Admin9\OidcServer\Tests\Feature;
 
 use Admin9\OidcServer\Tests\TestCase;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Passport\Client;
 
 class RevokeTest extends TestCase
 {
-    use RefreshDatabase;
-
-    protected function defineDatabaseMigrations(): void
+    protected function setUp(): void
     {
+        parent::setUp();
+
         $this->loadLaravelMigrations();
-        $this->artisan('passport:install', ['--no-interaction' => true]);
+        $this->loadMigrationsFrom(dirname(__DIR__, 2).'/vendor/laravel/passport/database/migrations');
+        $this->artisan('passport:keys', ['--force' => true]);
     }
 
     protected function createClient(array $attributes = []): Client
     {
         return Client::forceCreate(array_merge([
             'name' => 'Test Client',
-            'secret' => bcrypt('test-secret'),
-            'redirect' => 'https://app.example.com/callback',
-            'personal_access_client' => false,
-            'password_client' => false,
+            'secret' => 'test-secret',
+            'redirect_uris' => 'https://app.example.com/callback',
+            'grant_types' => 'authorization_code',
             'revoked' => false,
-            'public_client' => false,
         ], $attributes));
     }
 
