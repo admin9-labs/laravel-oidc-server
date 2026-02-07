@@ -1,12 +1,12 @@
 # Troubleshooting
 
-> Common errors and their solutions.
+This guide covers common errors and their solutions when working with the OIDC server.
 
-## Passport Keys Not Found
+## Missing Passport Keys
 
-**Error**: `LogicException: Unable to read key from file`
+**Error**: `LogicException: Unable to read key from file` or `file_get_contents(storage/oauth-public.key): failed to open stream`
 
-**Cause**: Passport RSA keys are missing.
+**Cause**: Passport RSA keys have not been generated.
 
 **Solution**:
 ```bash

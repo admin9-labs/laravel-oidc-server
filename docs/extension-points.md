@@ -1,6 +1,6 @@
 # Extension Points
 
-> How to customize and extend the OIDC server behavior.
+This document describes how to customize and extend the OIDC server behavior to fit your application's needs.
 
 ## Interfaces
 
@@ -28,7 +28,7 @@ Both are provided by the `HasOidcClaims` trait with sensible defaults.
 
 ### Custom Claims Resolution
 
-Three ways to customize how claims are resolved (see [claims-resolution.md](./claims-resolution.md)):
+Three ways to customize how claims are resolved (see [Claims Resolution](claims-resolution.md) for details):
 
 1. **Config-based** — `oidc-server.claims_resolver` maps claim names to attributes/callables
 2. **Model override** — override `resolveOidcClaim()` in your User model

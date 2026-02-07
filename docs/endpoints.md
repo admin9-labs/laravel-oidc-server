@@ -1,6 +1,6 @@
 # Endpoint Reference
 
-This document describes all HTTP endpoints provided by the `laravel-oidc-server` package.
+This document provides detailed information about all HTTP endpoints provided by the `laravel-oidc-server` package.
 
 ## Endpoint Overview
 

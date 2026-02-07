@@ -1,6 +1,6 @@
 # Claims Resolution
 
-> How user claims are resolved from scopes, with a 3-layer resolution mechanism.
+This document explains how user claims are resolved from scopes using a 3-layer resolution mechanism.
 
 ## Scope → Claims Mapping
 

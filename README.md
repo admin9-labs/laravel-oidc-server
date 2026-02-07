@@ -4,6 +4,8 @@
 [![Total Downloads](https://img.shields.io/packagist/dt/admin9/laravel-oidc-server.svg?style=flat-square)](https://packagist.org/packages/admin9/laravel-oidc-server)
 [![License](https://img.shields.io/packagist/l/admin9/laravel-oidc-server.svg?style=flat-square)](https://packagist.org/packages/admin9/laravel-oidc-server)
 
+[English](README.md) | [中文文档](docs/zh-CN/README.md)
+
 OpenID Connect Server for Laravel Passport — adds OIDC Discovery, JWKS, UserInfo, Token Introspection, Token Revocation, and RP-Initiated Logout to any Laravel + Passport application.
 
 ## Requirements
@@ -12,23 +14,17 @@ OpenID Connect Server for Laravel Passport — adds OIDC Discovery, JWKS, UserIn
 - Laravel 11 or 12
 - Laravel Passport 12 or 13
 
-## Installation
+## Quick Start
 
 > **Prerequisite:** [Laravel Passport](https://laravel.com/docs/passport) must be installed and configured before using this package.
+
+### 1. Install the package
 
 ```bash
 composer require admin9/laravel-oidc-server
 ```
 
-Publish the config (optional):
-
-```bash
-php artisan vendor:publish --tag=oidc-server-config
-```
-
-## Setup
-
-### 1. Implement the interface on your User model
+### 2. Implement the interface on your User model
 
 ```php
 use Admin9\OidcServer\Contracts\OidcUserInterface;
@@ -38,7 +34,7 @@ class User extends Authenticatable implements OidcUserInterface
 {
     use HasOidcClaims;
 
-    // Override for custom claims:
+    // Optional: Override for custom claims
     protected function resolveOidcClaim(string $claim): mixed
     {
         return match ($claim) {
@@ -50,10 +46,42 @@ class User extends Authenticatable implements OidcUserInterface
 }
 ```
 
-### 2. Generate Passport keys
+### 3. Generate Passport keys
 
 ```bash
 php artisan passport:keys
+```
+
+This creates the RSA key pair (`storage/oauth-private.key` and `storage/oauth-public.key`) needed for signing tokens.
+
+### 4. Create an OAuth client
+
+Create a client application that will use your OIDC server:
+
+```bash
+# For authorization code flow (recommended for web apps)
+php artisan passport:client
+
+# Or install default clients (personal access + password grant)
+php artisan passport:install
+```
+
+You'll receive a **Client ID** and **Client Secret** — save these for configuring your client application.
+
+### 5. (Optional) Publish and customize the config
+
+```bash
+php artisan vendor:publish --tag=oidc-server-config
+```
+
+Edit `config/oidc-server.php` to customize scopes, claims, token TTLs, and more.
+
+---
+
+**That's it!** Your OIDC server is ready. Test it by visiting:
+
+```
+https://your-app.test/.well-known/openid-configuration
 ```
 
 ## Endpoints
@@ -71,11 +99,11 @@ php artisan passport:keys
 
 ## Configuration
 
-Publish the config file and see `config/oidc-server.php` for all options. Key configuration sections:
+After publishing the config file, you can customize various aspects in `config/oidc-server.php`:
 
 ### User Model
 
-By default the package uses `config('auth.providers.users.model')` to look up users when generating ID tokens. Override with:
+By default, the package uses `config('auth.providers.users.model')` to look up users when generating ID tokens. Override if needed:
 
 ```php
 'user_model' => \App\Models\User::class,
@@ -83,7 +111,7 @@ By default the package uses `config('auth.providers.users.model')` to look up us
 
 ### Passport Route Control
 
-The package calls `Passport::ignoreRoutes()` by default to prevent route conflicts. Disable if you need Passport's default routes alongside OIDC:
+The package calls `Passport::ignoreRoutes()` by default to prevent route conflicts. Disable this if you need Passport's default routes alongside OIDC:
 
 ```php
 'ignore_passport_routes' => false,
@@ -102,14 +130,16 @@ The `HasOidcClaims` trait resolves standard claims via a configurable map. Overr
 ],
 ```
 
-For custom claims (e.g. `nickname`, `picture`), use `claims_resolver` or override `resolveOidcClaim()` in your User model.
+For custom claims (e.g., `nickname`, `picture`), use `claims_resolver` or override `resolveOidcClaim()` in your User model.
 
 ### Other Options
 
 - **Scopes & claims mapping** — `scopes`, `claims_resolver`
 - **Token TTLs** — `tokens.access_token_ttl`, `tokens.refresh_token_ttl`, `tokens.id_token_ttl`
 - **Route middleware** — `routes.discovery_middleware`, `routes.token_middleware`, `routes.userinfo_middleware`
-- **Passport auto-configuration** — `configure_passport` (set `false` to configure Passport yourself)
+- **Passport auto-configuration** — `configure_passport` (set to `false` to configure Passport yourself)
+
+See the [Configuration Reference](docs/configuration.md) for all available options.
 
 ## Documentation
 

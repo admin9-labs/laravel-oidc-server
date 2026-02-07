@@ -1,5 +1,7 @@
 # Configuration Reference
 
+This document provides a complete reference for all configuration options available in the `laravel-oidc-server` package.
+
 ## Publishing the Config
 
 Publish the configuration file with Artisan:

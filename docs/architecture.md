@@ -1,6 +1,6 @@
 # Architecture
 
-> How `laravel-oidc-server` extends Laravel Passport into a full OIDC Identity Provider.
+This document explains how `laravel-oidc-server` extends Laravel Passport into a full OIDC Identity Provider.
 
 ## Overview
 
@@ -93,7 +93,7 @@ JWT configuration is lazy-loaded (initialized on first use, not at boot time).
 | `auth_time` | Current timestamp | Authentication time |
 | `nonce` | Request parameter | Replay protection |
 
-Additional claims are added based on requested scopes (see [claims-resolution.md](./claims-resolution.md)).
+Additional claims are added based on requested scopes (see [Claims Resolution](claims-resolution.md) for details).
 
 ## Custom Client Model — OidcClient
 
