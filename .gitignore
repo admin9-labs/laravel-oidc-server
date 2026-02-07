@@ -4,3 +4,4 @@
 .phpunit.cache/
 composer.lock
 .claude
+.idea
