@@ -1,16 +1,48 @@
 # Changelog
 
-All notable changes to `laravel-oidc-server` will be documented in this file.
+All notable changes to `admin9/laravel-oidc-server` will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Changed
-- **BREAKING**: Config key renamed from `oidc` to `oidc-server`. Update your published config file name and any `config('oidc.*')` references.
-- Extracted `resolveNonce()` method in `TokenResponseType` for easier override/testing.
-- Enhanced config comments for `userinfo_middleware`, `default_claims_map`, and `routes`.
+### Added
+- Unit tests for `IdTokenService` and `TokenResponseType`.
+- Feature tests for OIDC endpoints (UserInfo, Introspect, Revoke, Logout) and claims resolution.
+- `CONTRIBUTING.md` with development setup and contribution guidelines.
+- `declare(strict_types=1)` to all PHP source files.
+
+### Fixed
+- Open redirect vulnerability in `isValidPostLogoutUri()` — path prefix matching now requires exact match or trailing `/`.
+- Basic Auth parsing in `authenticateClient()` — added strict base64 decode validation and URL-decoding of credentials per RFC 6749.
+
+## [1.0.0] - 2026-02-07
 
 ### Added
+- OIDC Discovery endpoint (`/.well-known/openid-configuration`).
+- JWKS (JSON Web Key Set) endpoint for public key distribution.
+- UserInfo endpoint with configurable middleware.
+- Token Introspection endpoint per RFC 7662 with `token_type_hint` validation.
+- Token Revocation endpoint per RFC 7009 with `token_type_hint` validation.
+- RP-Initiated Logout endpoint with `id_token_hint` support.
+- Automatic `id_token` injection into Passport token responses via `TokenResponseType`.
+- `IdTokenService` for signing ID tokens with RSA keys from Passport.
+- `ClaimsService` for resolving OIDC standard claims (profile, email, phone, address).
+- `HasOidcClaims` trait and `OidcUserInterface` contract for User model integration.
+- Configurable `default_claims_map` for mapping OIDC claims to User model attributes.
+- Configurable `user_model` option with fallback to `auth.providers.users.model`.
+- Configurable `ignore_passport_routes` option for conditional Passport route registration.
 - Event system: `OidcTokenIssued`, `OidcUserInfoRequested`, `OidcLogoutInitiated`.
-- Input validation for `token_type_hint` on introspect/revoke endpoints (RFC 7662/7009).
-- Security comment on `id_token_hint` parsing in logout endpoint.
-- `.gitattributes` for cleaner package installs.
+- `OidcClient` model extending Passport Client with OIDC-specific attributes.
+- Publishable configuration file (`config/oidc-server.php`).
+- Blade view for the authorize prompt.
+- Documentation for architecture, configuration, endpoints, claims resolution, extension points, and troubleshooting.
+
+### Changed
+- **BREAKING:** Config key renamed from `oidc` to `oidc-server`. Update published config filename and all `config('oidc.*')` references accordingly.
+- Extracted `resolveNonce()` method in `TokenResponseType` for improved testability.
+- Enhanced config comments for `userinfo_middleware` and `default_claims_map`.
+
+### Fixed
+- Added `defuse/php-encryption` as an explicit Composer dependency.
