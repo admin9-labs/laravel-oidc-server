@@ -1,5 +1,8 @@
 # Laravel OIDC Server
 
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/admin9/laravel-oidc-server.svg?style=flat-square)](https://packagist.org/packages/admin9/laravel-oidc-server)
+[![Total Downloads](https://img.shields.io/packagist/dt/admin9/laravel-oidc-server.svg?style=flat-square)](https://packagist.org/packages/admin9/laravel-oidc-server)
+
 OpenID Connect Server for Laravel Passport — adds OIDC Discovery, JWKS, UserInfo, Token Introspection, Token Revocation, and RP-Initiated Logout to any Laravel + Passport application.
 
 ## Requirements
