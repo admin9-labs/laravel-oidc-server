@@ -12,10 +12,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Feature tests for OIDC endpoints (UserInfo, Introspect, Revoke, Logout) and claims resolution.
 - `CONTRIBUTING.md` with development setup and contribution guidelines.
 - `declare(strict_types=1)` to all PHP source files.
+- `authors`, `homepage`, `support` fields to `composer.json`.
+
+### Changed
+- `composer.json`: `minimum-stability` from `dev` to `stable`.
+- Removed all `Log::*` calls from `OidcController` — logging is the host application's responsibility; use events instead.
 
 ### Fixed
 - Open redirect vulnerability in `isValidPostLogoutUri()` — path prefix matching now requires exact match or trailing `/`.
 - Basic Auth parsing in `authenticateClient()` — added strict base64 decode validation and URL-decoding of credentials per RFC 6749.
+- README: incorrect config path reference (`config/oidc.php` → `config/oidc-server.php`).
+- `docs/configuration.md`: incorrect publish tag (`--tag=oidc-config` → `--tag=oidc-server-config`).
+- `docs/configuration.md`: `token_middleware` description now lists all four covered endpoints.
+- `docs/configuration.md`: `id_token_ttl` marked as reserved (not yet used in code).
+- `docs/troubleshooting.md`: corrected logout redirect troubleshooting advice to match actual validation logic.
+- `docs/architecture.md`: `exp` claim source corrected to "Access token expiry".
 
 ## [1.0.0] - 2026-02-07
 
