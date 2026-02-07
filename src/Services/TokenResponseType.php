@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Admin9\OidcServer\Services;
 
 use Admin9\OidcServer\Contracts\OidcUserInterface;

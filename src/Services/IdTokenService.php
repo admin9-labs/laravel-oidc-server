@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Admin9\OidcServer\Services;
 
 use Admin9\OidcServer\Contracts\OidcUserInterface;
@@ -56,7 +58,7 @@ class IdTokenService
             ->withClaim('auth_time', $now->getTimestamp());
 
         if ($nonce) {
-            $builder->withClaim('nonce', $nonce);
+            $builder = $builder->withClaim('nonce', $nonce);
         }
 
         // Add claims based on scopes
@@ -67,7 +69,7 @@ class IdTokenService
         $claims = $this->claimsService->resolveForUser($user, $scopes);
         foreach ($claims as $key => $value) {
             if ($key !== 'sub') {
-                $builder->withClaim($key, $value);
+                $builder = $builder->withClaim($key, $value);
             }
         }
 

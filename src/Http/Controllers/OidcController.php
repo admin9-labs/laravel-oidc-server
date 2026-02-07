@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Admin9\OidcServer\Http\Controllers;
 
 use Admin9\OidcServer\Contracts\OidcUserInterface;
@@ -248,7 +250,7 @@ class OidcController extends Controller
             $isValid = false;
 
             if ($client) {
-                $allowedUris = explode(',', $client->redirect);
+                $allowedUris = $client->redirect_uris ?? [];
                 $isValid = $this->isValidPostLogoutUri($postLogoutRedirectUri, $allowedUris);
             } else {
                 $isValid = $this->isValidPostLogoutUri($postLogoutRedirectUri, [config('app.url')]);
@@ -275,8 +277,12 @@ class OidcController extends Controller
         if ($request->headers->has('Authorization')) {
             $authHeader = $request->headers->get('Authorization');
             if (str_starts_with($authHeader, 'Basic ')) {
-                $credentials = base64_decode(substr($authHeader, 6));
-                [$clientId, $clientSecret] = explode(':', $credentials, 2) + [null, null];
+                $decoded = base64_decode(substr($authHeader, 6), true);
+                if ($decoded !== false && str_contains($decoded, ':')) {
+                    [$clientId, $clientSecret] = explode(':', $decoded, 2);
+                    $clientId = urldecode($clientId);
+                    $clientSecret = urldecode($clientSecret);
+                }
             }
         }
 
@@ -295,7 +301,7 @@ class OidcController extends Controller
             return null;
         }
 
-        if (! $client->public_client && ! Hash::check($clientSecret, $client->secret)) {
+        if ($client->confidential() && ! Hash::check($clientSecret, $client->secret)) {
             return null;
         }
 
@@ -455,10 +461,11 @@ class OidcController extends Controller
             $portMatch = ($uriParsed['port'] ?? null) === ($allowedParsed['port'] ?? null);
 
             if ($schemeMatch && $hostMatch && $portMatch) {
-                $allowedPath = $allowedParsed['path'] ?? '/';
+                $allowedPath = rtrim($allowedParsed['path'] ?? '/', '/');
                 $uriPath = $uriParsed['path'] ?? '/';
 
-                if (str_starts_with($uriPath, $allowedPath)) {
+                // Exact match or the URI path starts with the allowed path followed by /
+                if ($allowedPath === '' || $uriPath === $allowedPath || str_starts_with($uriPath, $allowedPath.'/')) {
                     return true;
                 }
             }
