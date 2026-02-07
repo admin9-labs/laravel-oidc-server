@@ -10,6 +10,8 @@ OpenID Connect Server for Laravel Passport — adds OIDC Discovery, JWKS, UserIn
 
 ## Installation
 
+> **Prerequisite:** [Laravel Passport](https://laravel.com/docs/passport) must be installed and configured before using this package.
+
 ```bash
 composer require admin9/laravel-oidc-server
 ```
@@ -105,6 +107,15 @@ For custom claims (e.g. `nickname`, `picture`), use `claims_resolver` or overrid
 - **Route middleware** — `routes.discovery_middleware`, `routes.token_middleware`, `routes.userinfo_middleware`
 - **Passport auto-configuration** — `configure_passport` (set `false` to configure Passport yourself)
 
+## Documentation
+
+- [Architecture](docs/architecture.md)
+- [Configuration Reference](docs/configuration.md)
+- [Endpoint Reference](docs/endpoints.md)
+- [Claims Resolution](docs/claims-resolution.md)
+- [Extension Points](docs/extension-points.md)
+- [Troubleshooting](docs/troubleshooting.md)
+
 ## License
 
-MIT
+[MIT](LICENSE.md)
