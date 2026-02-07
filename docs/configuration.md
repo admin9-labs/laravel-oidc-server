@@ -5,7 +5,7 @@
 Publish the configuration file with Artisan:
 
 ```bash
-php artisan vendor:publish --tag=oidc-config
+php artisan vendor:publish --tag=oidc-server-config
 ```
 
 This copies `oidc-server.php` into your application's `config/` directory.

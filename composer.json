@@ -4,6 +4,17 @@
     "keywords": ["laravel", "passport", "oidc", "openid-connect", "oauth2"],
     "license": "MIT",
     "type": "library",
+    "authors": [
+        {
+            "name": "ADMIN9 Labs",
+            "homepage": "https://github.com/admin9-labs"
+        }
+    ],
+    "homepage": "https://github.com/admin9-labs/laravel-oidc-server",
+    "support": {
+        "issues": "https://github.com/admin9-labs/laravel-oidc-server/issues",
+        "source": "https://github.com/admin9-labs/laravel-oidc-server"
+    },
     "require": {
         "php": "^8.2",
         "defuse/php-encryption": "^2.4",
@@ -39,6 +50,6 @@
             "pestphp/pest-plugin": true
         }
     },
-    "minimum-stability": "dev",
+    "minimum-stability": "stable",
     "prefer-stable": true
 }

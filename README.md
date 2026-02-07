@@ -65,7 +65,7 @@ php artisan passport:keys
 
 ## Configuration
 
-Publish the config file and see `config/oidc.php` for all options. Key configuration sections:
+Publish the config file and see `config/oidc-server.php` for all options. Key configuration sections:
 
 ### User Model
 

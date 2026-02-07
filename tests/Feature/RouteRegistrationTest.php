@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Admin9\OidcServer\Tests\Feature;
 
 use Admin9\OidcServer\Tests\TestCase;
