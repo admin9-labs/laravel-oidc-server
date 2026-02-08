@@ -62,11 +62,19 @@ Create a client application that will use your OIDC server:
 # For authorization code flow (recommended for web apps)
 php artisan passport:client
 
+# For client credentials grant (recommended for machine-to-machine, e.g., microservices)
+php artisan passport:client --client
+
 # Or install default clients (personal access + password grant)
 php artisan passport:install
 ```
 
 You'll receive a **Client ID** and **Client Secret** — save these for configuring your client application.
+
+**Grant Type Guide:**
+- **Authorization Code Flow**: For web apps with user interaction, most secure
+- **Client Credentials Grant**: For server-to-server API calls, no user involvement
+- **Password Grant**: Only for first-party trusted apps, not recommended for third-party
 
 ### 5. (Optional) Publish and customize the config
 

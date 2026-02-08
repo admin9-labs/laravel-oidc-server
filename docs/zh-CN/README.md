@@ -60,11 +60,19 @@ php artisan passport:keys
 # 用于授权码流程（推荐用于 Web 应用）
 php artisan passport:client
 
+# 用于客户端凭证授权（推荐用于机器对机器通信，如微服务）
+php artisan passport:client --client
+
 # 或安装默认客户端（个人访问令牌 + 密码授权）
 php artisan passport:install
 ```
 
 您将收到一个 **Client ID** 和 **Client Secret** — 保存这些信息以便配置您的客户端应用程序。
+
+**授权类型说明：**
+- **Authorization Code Flow**：适用于有用户交互的 Web 应用，最安全
+- **Client Credentials Grant**：适用于服务端到服务端的 API 调用，无需用户参与
+- **Password Grant**：仅适用于第一方可信应用，不推荐用于第三方
 
 ### 5. （可选）发布并自定义配置
 
