@@ -63,6 +63,9 @@ php artisan passport:client
 # 用于客户端凭证授权（推荐用于机器对机器通信，如微服务）
 php artisan passport:client --client
 
+# 用于密码授权（仅用于第一方可信应用）
+php artisan passport:client --password
+
 # 或安装默认客户端（个人访问令牌 + 密码授权）
 php artisan passport:install
 ```

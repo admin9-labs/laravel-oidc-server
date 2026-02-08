@@ -65,6 +65,9 @@ php artisan passport:client
 # For client credentials grant (recommended for machine-to-machine, e.g., microservices)
 php artisan passport:client --client
 
+# For password grant (only for first-party trusted apps)
+php artisan passport:client --password
+
 # Or install default clients (personal access + password grant)
 php artisan passport:install
 ```
