@@ -87,5 +87,7 @@ class OidcServerServiceProvider extends PackageServiceProvider
     {
         Route::middleware('web')
             ->group(__DIR__.'/../routes/web.php');
+
+        Route::group([], __DIR__.'/../routes/api.php');
     }
 }
