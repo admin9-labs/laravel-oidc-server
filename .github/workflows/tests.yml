@@ -73,7 +73,7 @@ jobs:
         run: composer validate --strict --no-check-publish
 
       - name: Run PHPUnit
-        run: vendor/bin/phpunit --display-phpunit-notices
+        run: vendor/bin/phpunit
 
       - name: Run Pest
         run: vendor/bin/pest
