@@ -38,7 +38,7 @@ class TokenResponseTypeTest extends TestCase
 
     protected function createScopeMock(string $name): ScopeEntityInterface
     {
-        $scope = $this->createMock(ScopeEntityInterface::class);
+        $scope = $this->createStub(ScopeEntityInterface::class);
         $scope->method('getIdentifier')->willReturn($name);
 
         return $scope;
@@ -51,10 +51,10 @@ class TokenResponseTypeTest extends TestCase
 
         $responseType = new TokenResponseType($idTokenService);
 
-        $client = $this->createMock(ClientEntityInterface::class);
+        $client = $this->createStub(ClientEntityInterface::class);
         $client->method('getIdentifier')->willReturn('test-client');
 
-        $accessToken = $this->createMock(AccessTokenEntityInterface::class);
+        $accessToken = $this->createStub(AccessTokenEntityInterface::class);
         $accessToken->method('getScopes')->willReturn([
             $this->createScopeMock('profile'),
             $this->createScopeMock('email'),
@@ -68,15 +68,15 @@ class TokenResponseTypeTest extends TestCase
 
     public function test_returns_empty_array_when_user_not_found(): void
     {
-        $idTokenService = $this->createMock(IdTokenService::class);
+        $idTokenService = $this->createStub(IdTokenService::class);
         $responseType = new TokenResponseType($idTokenService);
 
         config(['oidc-server.user_model' => TokenResponseTestUser::class]);
 
-        $client = $this->createMock(ClientEntityInterface::class);
+        $client = $this->createStub(ClientEntityInterface::class);
         $client->method('getIdentifier')->willReturn('test-client');
 
-        $accessToken = $this->createMock(AccessTokenEntityInterface::class);
+        $accessToken = $this->createStub(AccessTokenEntityInterface::class);
         $accessToken->method('getScopes')->willReturn([
             $this->createScopeMock('openid'),
         ]);
@@ -100,10 +100,10 @@ class TokenResponseTypeTest extends TestCase
 
         config(['oidc-server.user_model' => TokenResponseTestUser::class]);
 
-        $client = $this->createMock(ClientEntityInterface::class);
+        $client = $this->createStub(ClientEntityInterface::class);
         $client->method('getIdentifier')->willReturn('test-client');
 
-        $accessToken = $this->createMock(AccessTokenEntityInterface::class);
+        $accessToken = $this->createStub(AccessTokenEntityInterface::class);
         $accessToken->method('getScopes')->willReturn([
             $this->createScopeMock('openid'),
         ]);

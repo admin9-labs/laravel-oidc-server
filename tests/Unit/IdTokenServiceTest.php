@@ -43,15 +43,15 @@ class IdTokenServiceTest extends TestCase
     ): AccessTokenEntityInterface {
         $scopes = [];
         foreach ($scopeNames as $name) {
-            $scope = $this->createMock(ScopeEntityInterface::class);
+            $scope = $this->createStub(ScopeEntityInterface::class);
             $scope->method('getIdentifier')->willReturn($name);
             $scopes[] = $scope;
         }
 
-        $client = $this->createMock(ClientEntityInterface::class);
+        $client = $this->createStub(ClientEntityInterface::class);
         $client->method('getIdentifier')->willReturn('test-client-id');
 
-        $accessToken = $this->createMock(AccessTokenEntityInterface::class);
+        $accessToken = $this->createStub(AccessTokenEntityInterface::class);
         $accessToken->method('getScopes')->willReturn($scopes);
         $accessToken->method('getClient')->willReturn($client);
         $accessToken->method('getUserIdentifier')->willReturn($userId);
@@ -80,7 +80,7 @@ class IdTokenServiceTest extends TestCase
     {
         $accessToken = $this->createMockAccessToken();
         $user = $this->createTestUser();
-        $client = $this->createMock(ClientEntityInterface::class);
+        $client = $this->createStub(ClientEntityInterface::class);
         $client->method('getIdentifier')->willReturn('test-client-id');
 
         $jwt = $this->idTokenService->generateToken($accessToken, $user, $client);
@@ -98,7 +98,7 @@ class IdTokenServiceTest extends TestCase
 
         $accessToken = $this->createMockAccessToken();
         $user = $this->createTestUser();
-        $client = $this->createMock(ClientEntityInterface::class);
+        $client = $this->createStub(ClientEntityInterface::class);
         $client->method('getIdentifier')->willReturn('my-client');
 
         $jwt = $this->idTokenService->generateToken($accessToken, $user, $client);
@@ -113,7 +113,7 @@ class IdTokenServiceTest extends TestCase
     {
         $accessToken = $this->createMockAccessToken();
         $user = $this->createTestUser();
-        $client = $this->createMock(ClientEntityInterface::class);
+        $client = $this->createStub(ClientEntityInterface::class);
         $client->method('getIdentifier')->willReturn('test-client-id');
 
         $jwt = $this->idTokenService->generateToken($accessToken, $user, $client, 'abc123');
@@ -127,7 +127,7 @@ class IdTokenServiceTest extends TestCase
     {
         $accessToken = $this->createMockAccessToken();
         $user = $this->createTestUser();
-        $client = $this->createMock(ClientEntityInterface::class);
+        $client = $this->createStub(ClientEntityInterface::class);
         $client->method('getIdentifier')->willReturn('test-client-id');
 
         $jwt = $this->idTokenService->generateToken($accessToken, $user, $client, null);
@@ -147,7 +147,7 @@ class IdTokenServiceTest extends TestCase
 
         $accessToken = $this->createMockAccessToken(['openid', 'profile', 'email']);
         $user = $this->createTestUser();
-        $client = $this->createMock(ClientEntityInterface::class);
+        $client = $this->createStub(ClientEntityInterface::class);
         $client->method('getIdentifier')->willReturn('test-client-id');
 
         $jwt = $this->idTokenService->generateToken($accessToken, $user, $client);

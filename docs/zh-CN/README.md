@@ -9,7 +9,7 @@
 ## 系统要求
 
 - PHP 8.2+
-- Laravel 11 或 12
+- Laravel 11、12 或 13
 - Laravel Passport 12 或 13
 
 ## 快速开始
