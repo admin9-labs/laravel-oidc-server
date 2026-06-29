@@ -308,7 +308,13 @@ class OidcController extends Controller
     protected function findToken(string $token, string $tokenTypeHint): ?array
     {
         if ($tokenTypeHint === 'access_token' || $tokenTypeHint === '') {
-            $accessToken = Token::where('id', $token)->first();
+            $tokenId = $this->extractAccessTokenId($token);
+
+            if (! $tokenId) {
+                return null;
+            }
+
+            $accessToken = Token::find($tokenId);
 
             if ($accessToken && ! $accessToken->revoked) {
                 $expiresAt = $accessToken->expires_at;
