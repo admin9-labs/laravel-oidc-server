@@ -61,12 +61,6 @@ jobs:
       - name: Install dependencies
         run: |
           composer update \
-            laravel/framework \
-            laravel/passport \
-            orchestra/testbench \
-            spatie/laravel-package-tools \
-            pestphp/pest \
-            phpunit/phpunit \
             --with laravel/framework:${{ matrix.laravel }} \
             --with orchestra/testbench:${{ matrix.testbench }} \
             --with pestphp/pest:${{ matrix.pest }} \
