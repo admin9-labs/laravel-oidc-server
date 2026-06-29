@@ -11,7 +11,7 @@ OpenID Connect Server for Laravel Passport — adds OIDC Discovery, JWKS, UserIn
 ## Requirements
 
 - PHP 8.2+
-- Laravel 11 or 12
+- Laravel 11, 12, or 13
 - Laravel Passport 12 or 13
 
 ## Quick Start
