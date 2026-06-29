@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-06-30
+
+### Added
+- Laravel 13 support validation with CI coverage for Laravel 11, 12, and 13.
+- GitHub Actions test matrix for PHPUnit and Pest across supported Laravel versions.
+
+### Changed
+- Expanded development dependency constraints to support Orchestra Testbench 11, Pest 4, and PHPUnit 12.
+- Updated English and Chinese README requirements to list Laravel 11, 12, and 13.
+
 ## [1.1.1] - 2026-02-07
 
 ### Added
