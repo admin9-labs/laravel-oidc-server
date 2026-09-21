@@ -112,11 +112,13 @@ https://your-app.test/.well-known/openid-configuration
 
 ### 用户模型
 
-默认情况下，扩展包使用 `config('auth.providers.users.model')` 在生成 ID 令牌时查找用户。如有需要可以覆盖：
+默认情况下，ID 令牌使用 `passport.guard` 所选会话 guard 的 provider 模型查找用户。如有需要可以覆盖：
 
 ```php
 'user_model' => \App\Models\User::class,
 ```
+
+`user_model` 不会选择登录 guard。授权和登出使用 `passport.guard`；ID 令牌模型与 UserInfo 使用的 Passport API provider 必须代表同一组用户。完整的 Member 配置参见[替代用户模型与 guard](configuration.md#替代用户模型与-guard)。
 
 ### Passport 路由控制
 

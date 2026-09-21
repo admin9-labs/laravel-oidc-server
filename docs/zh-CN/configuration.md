@@ -32,7 +32,47 @@ OpenID Connect 发行者标识符。此值会出现在 ID 令牌的 `iss` 声明
 |-----|------|---------|
 | `user_model` | `string\|null` | `null` |
 
-用于在生成 ID 令牌时查找用户的完全限定 Eloquent 模型类。当为 `null` 时，扩展包会回退到 `config/auth.php` 中默认认证提供者定义的模型。
+用于在生成 ID 令牌时查找用户的完全限定 Eloquent 模型类。当为 `null` 时，使用 `passport.guard` 对应 provider 的模型；若 `passport.guard` 为 null，则使用 `auth.defaults.guard`。自定义 provider 没有 Eloquent 模型配置时，需要显式设置此项。
+
+### 替代用户模型与 guard
+
+`passport.guard` 是交互式授权和 `/oauth/logout` 唯一的会话 guard 配置，必须指向有状态的 session guard。`user_model` 只控制 ID 令牌查询，不会改变浏览器登录或 UserInfo 使用的 Bearer Token provider。
+
+如果 OIDC 使用 Member，而管理员使用独立的 User，应将三处配置对齐：
+
+```php
+// config/auth.php（合并到已有配置）
+'guards' => [
+    'web' => ['driver' => 'session', 'provider' => 'users'],
+    'member_web' => ['driver' => 'session', 'provider' => 'members'],
+    'api' => ['driver' => 'passport', 'provider' => 'members'],
+],
+'providers' => [
+    'users' => ['driver' => 'eloquent', 'model' => App\Models\User::class],
+    'members' => ['driver' => 'eloquent', 'model' => App\Models\Member::class],
+],
+
+// config/passport.php
+'guard' => 'member_web',
+
+// config/oidc-server.php
+'user_model' => App\Models\Member::class, // null 也会解析到 members.model
+'routes' => [
+    'enabled' => true,
+    'discovery_middleware' => [],
+    'authorization_middleware' => [],
+    'token_middleware' => [],
+    'userinfo_middleware' => ['auth:api'],
+],
+```
+
+Member 必须实现 `OidcUserInterface`，使用 `HasOidcClaims` 或自行提供 claims，并满足已安装 Passport 版本的用户模型要求，包括 `HasApiTokens`，以及 Passport 13 的 `OAuthenticatable`。会员登录必须登录到 `member_web`；应用应为该 guard 配置未认证时跳转的会员登录页。OAuth 客户端若设置了非空 `provider`，必须为 `members`。切换 provider 后，不得复用为原身份域签发的客户端、访问令牌和刷新令牌。
+
+显式设置的 `user_model` 必须与授权及 UserInfo provider 解析到相同身份。扩展包保留模型覆盖和自定义 provider 的支持，无法自动判断不同模型类是否代表同一组用户。无关表可能存在相同的数字 ID，因此仅修改 `user_model` 是不安全的。
+
+默认由 Passport 处理 GET 授权认证（包括 `prompt=none`），POST/DELETE 则始终要求所选 guard 已登录。可选的 `routes.authorization_middleware`（例如 `['auth:member_web']`）应用于这三种方法，不会保护 Discovery/JWKS。GET 上的认证中间件会先于 Passport 执行，因此会替代未登录时的 `prompt=none` 处理。
+
+`/oauth/logout` 仅注销所选 guard，清除 Passport 待确认授权状态及该 guard 的 `auth.session` 密码哈希，轮换 session ID 与 CSRF token，并保留其他会话数据。Laravel 共享的密码确认时间也会清除，确保后续登录者确认自己的密码；其他已登录 guard 执行敏感操作时可能需要重新确认密码。这替代了此前清空整个会话的行为；需要清理额外数据的应用可通过 `OidcLogoutInitiated` 监听器处理。隔离保证仅适用于本扩展包的登出端点；Passport 上游的 `prompt=login` 流程仍可能使共享会话整体失效。
 
 ---
 
@@ -238,13 +278,17 @@ Passport 客户端模型类。默认的 `OidcClient` 模型会跳过第一方客
 |-----|------|---------|
 | `routes.enabled` | `bool` | `true` |
 | `routes.discovery_middleware` | `array` | `[]` |
+| `routes.authorization_middleware` | `array` | `[]` |
 | `routes.token_middleware` | `array` | `[]` |
 | `routes.userinfo_middleware` | `array` | `['auth:api']` |
 
 - `enabled` -- 设置为 `false` 可禁用扩展包注册的所有路由。
 - `discovery_middleware` -- 应用于 `/.well-known/openid-configuration` 和 JWKS 端点的中间件。
-- `token_middleware` -- 应用于 `/oauth/token`、`/oauth/introspect`、`/oauth/revoke` 和 `/oauth/logout` 端点的中间件。
+- `authorization_middleware` -- 应用于 GET/POST/DELETE `/oauth/authorize` 的额外中间件。POST/DELETE 还必须通过 `passport.guard` 认证。
+- `token_middleware` -- 应用于 `/oauth/token`、`/oauth/introspect` 和 `/oauth/revoke` 端点的中间件。登出使用 `web` 中间件组提供会话支持。
 - `userinfo_middleware` -- 应用于 userinfo 端点的中间件。默认为 `auth:api`。
+
+升级说明：授权路由不再继承 `discovery_middleware`。请将授权专用中间件移动到 `authorization_middleware`，公开元数据端点所需中间件保留在 `discovery_middleware`。
 
 ---
 

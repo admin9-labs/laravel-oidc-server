@@ -381,12 +381,12 @@ HTTP/1.1 401 Unauthorized
 
 ## 8. RP 发起的登出
 
-允许依赖方（客户端应用程序）将用户从 OpenID 提供者登出。服务器使用户的会话失效，并可选择重定向到登出后的 URI。
+允许依赖方（客户端应用程序）将用户从 OpenID 提供者登出。服务器注销 `passport.guard`，清除 Passport 待确认授权状态、该 guard 的会话密码哈希及共享的密码确认时间，轮换 session ID 与 CSRF token，并可选择重定向到登出后的 URI。其他 guard 的登录状态和无关会话数据会保留。
 
 - **方法：** `GET`
 - **路径：** `/oauth/logout`
 - **认证：** 不需要（可选的 `id_token_hint` 用于客户端识别）
-- **中间件：** 可通过 `oidc-server.routes.token_middleware` 配置
+- **中间件：** `web`（会话和 CSRF 支持）
 - **规范：** [OpenID Connect RP-Initiated Logout 1.0](https://openid.net/specs/openid-connect-rpinitiated-1_0.html)
 
 ### 请求

@@ -31,7 +31,13 @@ class TokenResponseType extends BearerTokenResponse
             return [];
         }
 
-        $userModel = config('oidc-server.user_model', config('auth.providers.users.model'));
+        $userModel = config('oidc-server.user_model');
+        if ($userModel === null) {
+            $guard = config('passport.guard') ?? config('auth.defaults.guard');
+            $provider = config('auth.guards.'.$guard.'.provider');
+            $userModel = config('auth.providers.'.$provider.'.model');
+        }
+
         $user = $userModel::find($accessToken->getUserIdentifier());
 
         if (! $user || ! $user instanceof OidcUserInterface) {

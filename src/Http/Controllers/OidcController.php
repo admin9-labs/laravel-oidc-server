@@ -234,14 +234,23 @@ class OidcController extends Controller
             }
         }
 
+        $guardName = config('passport.guard') ?? auth()->getDefaultDriver();
+        $guard = auth()->guard($guardName);
+
         OidcLogoutInitiated::dispatch(
-            auth()->guard('web')->id(),
+            $guard->id(),
             $client?->id,
         );
 
-        auth()->guard('web')->logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+        $guard->logout();
+        $request->session()->forget([
+            'authToken',
+            'authRequest',
+            'promptedForLogin',
+            'password_hash_'.$guardName,
+            'auth.password_confirmed_at',
+        ]);
+        $request->session()->regenerate(true);
 
         if ($postLogoutRedirectUri) {
             $isValid = false;

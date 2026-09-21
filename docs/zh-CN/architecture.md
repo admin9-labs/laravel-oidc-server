@@ -132,6 +132,6 @@ Client Application                    Auth Server (this package)
   │                                         │
   │  8. GET /oauth/logout (optional)        │
   │ ───────────────────────────────────────→ │
-  │                                         │  9. Clear session, redirect back
+  │                                         │  9. Logout guard, rotate session, redirect back
   │ ←─────────────────────────────────────── │
 ```

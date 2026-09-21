@@ -381,12 +381,12 @@ HTTP/1.1 401 Unauthorized
 
 ## 8. RP-Initiated Logout
 
-Allows a Relying Party (client application) to log the user out of the OpenID Provider. The server invalidates the user's session and optionally redirects to a post-logout URI.
+Allows a Relying Party (client application) to log the user out of the OpenID Provider. The server logs out `passport.guard`, clears pending Passport authorization state, that guard's session password hash, and the shared password-confirmation timestamp, rotates the session ID and CSRF token, and optionally redirects to a post-logout URI. Other guards' login state and unrelated session data are preserved.
 
 - **Method:** `GET`
 - **Path:** `/oauth/logout`
 - **Authentication:** None required (optional `id_token_hint` for client identification)
-- **Middleware:** Configurable via `oidc-server.routes.token_middleware`
+- **Middleware:** `web` (session and CSRF support)
 - **Spec:** [OpenID Connect RP-Initiated Logout 1.0](https://openid.net/specs/openid-connect-rpinitiated-1_0.html)
 
 ### Request

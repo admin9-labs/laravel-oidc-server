@@ -16,15 +16,20 @@ class LogoutTest extends TestCase
         $response->assertRedirect('/');
     }
 
-    public function test_logout_invalidates_session(): void
+    public function test_logout_rotates_session_and_preserves_unrelated_data(): void
     {
+        $this->withSession(['_token' => 'test']);
+        $oldSessionId = session()->getId();
+
         $response = $this->withSession([
             '_token' => 'test',
             'some_data' => 'value',
         ])->get('/oauth/logout');
 
         $response->assertRedirect('/');
-        $response->assertSessionMissing('some_data');
+        $response->assertSessionHas('some_data', 'value');
+        $this->assertNotSame($oldSessionId, session()->getId());
+        $this->assertNotSame('test', session()->token());
     }
 
     public function test_logout_with_invalid_redirect_uri_goes_to_home(): void

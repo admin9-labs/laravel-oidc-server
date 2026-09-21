@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 return [
     /*
     |--------------------------------------------------------------------------
@@ -14,7 +16,9 @@ return [
     |--------------------------------------------------------------------------
     |
     | The Eloquent model class used to look up users when generating ID tokens.
-    | Falls back to the default auth provider model if not set.
+    | Falls back to the provider model of passport.guard if not set.
+    | Must represent the same users as that session guard and the Passport
+    | API guard protecting UserInfo. This option does not select a guard.
     |
     */
     'user_model' => null,
@@ -210,7 +214,9 @@ return [
     |
     | Control route registration and per-group middleware.
     | - discovery_middleware: Applied to /.well-known/* endpoints
-    | - token_middleware: Applied to /oauth/token, introspect, revoke, logout
+    | - authorization_middleware: Additional middleware for /oauth/authorize;
+    |   Passport handles GET authentication and POST/DELETE require passport.guard
+    | - token_middleware: Applied to /oauth/token, introspect, revoke
     | - userinfo_middleware: Applied to /oauth/userinfo (default: auth:api,
     |   which requires a valid Passport access token)
     |
@@ -218,6 +224,7 @@ return [
     'routes' => [
         'enabled' => true,
         'discovery_middleware' => [],
+        'authorization_middleware' => [],
         'token_middleware' => [],
         'userinfo_middleware' => ['auth:api'],
     ],

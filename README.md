@@ -114,11 +114,13 @@ After publishing the config file, you can customize various aspects in `config/o
 
 ### User Model
 
-By default, the package uses `config('auth.providers.users.model')` to look up users when generating ID tokens. Override if needed:
+By default, ID tokens use the provider model of the session guard selected by `passport.guard`. Override if needed:
 
 ```php
 'user_model' => \App\Models\User::class,
 ```
+
+`user_model` does not select a login guard. Authorization and logout use `passport.guard`; the ID Token model and the Passport API provider for UserInfo must represent the same users. See [alternate user models and guards](docs/configuration.md#alternate-user-models-and-guards) for a complete Member configuration.
 
 ### Passport Route Control
 

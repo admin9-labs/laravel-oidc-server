@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Admin9\OidcServer;
 
+use Admin9\OidcServer\Models\OidcClient;
+use Admin9\OidcServer\Models\Passport12OidcClient;
 use Admin9\OidcServer\Services\ClaimsService;
 use Admin9\OidcServer\Services\IdTokenService;
 use Admin9\OidcServer\Services\TokenResponseType;
 use Carbon\CarbonInterval;
 use Illuminate\Support\Facades\Route;
+use Laravel\Passport\Client;
 use Laravel\Passport\Passport;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
@@ -53,6 +56,10 @@ class OidcServerServiceProvider extends PackageServiceProvider
 
         // Client model
         $clientModel = config('oidc-server.client_model');
+        if ($clientModel === OidcClient::class &&
+            (new \ReflectionMethod(Client::class, 'skipsAuthorization'))->getNumberOfRequiredParameters() === 0) {
+            $clientModel = Passport12OidcClient::class;
+        }
         if ($clientModel) {
             Passport::useClientModel($clientModel);
         }
@@ -65,7 +72,7 @@ class OidcServerServiceProvider extends PackageServiceProvider
         Passport::tokensCan($scopes);
 
         // Default scopes
-        Passport::defaultScopes(config('oidc-server.default_scopes', ['openid']));
+        Passport::setDefaultScope(config('oidc-server.default_scopes', ['openid']));
 
         // Token lifetimes
         Passport::tokensExpireIn(
@@ -80,7 +87,7 @@ class OidcServerServiceProvider extends PackageServiceProvider
 
         // Custom token response type with id_token injection
         $tokenResponse = $this->app->make(TokenResponseType::class);
-        Passport::useAuthorizationServerResponseType($tokenResponse);
+        Passport::$authorizationServerResponseType = $tokenResponse;
     }
 
     protected function registerRoutes(): void
