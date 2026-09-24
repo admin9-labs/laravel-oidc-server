@@ -8,6 +8,8 @@
 
 本版省略 auth_time，明确拒绝 max_age / Essential auth_time 请求。完整 OIDC 认证新鲜度支持仍延期，详见[升级说明](upgrading-to-1.2.2.md)。
 
+[2.0.0 认证新鲜度设计提案](authentication-freshness-2.0.md)说明拟议的宿主契约、授权流程、兼容规则和发布验收条件；这些能力尚未在当前版本实现。
+
 ## 系统要求
 
 - PHP 8.2+

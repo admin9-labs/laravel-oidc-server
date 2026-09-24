@@ -10,6 +10,8 @@ OpenID Connect Server for Laravel Passport — adds OIDC Discovery, JWKS, UserIn
 
 This release omits auth_time and rejects max_age / Essential auth_time requests. Full OIDC authentication freshness remains deferred; see the [upgrade guide](docs/upgrading-to-1.2.2.md).
 
+The [2.0.0 authentication freshness proposal](docs/authentication-freshness-2.0.md) describes the planned host contract, authorization flow, compatibility rules, and release gates. It is not implemented in this release.
+
 ## Requirements
 
 - PHP 8.2+
