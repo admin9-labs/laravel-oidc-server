@@ -155,7 +155,7 @@ class IdTokenServiceTest extends TestCase
 
         $this->assertSame('Jane Doe', $parsed->claims()->get('name'));
         $this->assertSame('jane@example.com', $parsed->claims()->get('email'));
-        $this->assertTrue($parsed->claims()->has('auth_time'));
+        $this->assertFalse($parsed->claims()->has('auth_time'));
     }
 }
 

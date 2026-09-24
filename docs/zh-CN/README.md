@@ -6,6 +6,8 @@
 
 适用于 Laravel Passport 的 OpenID Connect 服务器 — 为任何 Laravel + Passport 应用程序添加 OIDC 发现、JWKS、用户信息、令牌自省、令牌撤销和 RP 发起的登出功能。
 
+本版省略 auth_time，明确拒绝 max_age / Essential auth_time 请求。完整 OIDC 认证新鲜度支持仍延期，详见[升级说明](upgrading-to-1.2.2.md)。
+
 ## 系统要求
 
 - PHP 8.2+
@@ -104,7 +106,7 @@ https://your-app.test/.well-known/openid-configuration
 | `/oauth/userinfo` | GET/POST | 用户信息 |
 | `/oauth/introspect` | POST | 令牌自省（RFC 7662） |
 | `/oauth/revoke` | POST | 令牌撤销（RFC 7009） |
-| `/oauth/logout` | GET | RP 发起的登出 |
+| `/oauth/logout` | GET, POST | RP 发起的登出 |
 
 ## 配置
 
@@ -164,3 +166,7 @@ https://your-app.test/.well-known/openid-configuration
 ## 许可证
 
 [MIT](../../LICENSE.md)
+
+## 安全升级
+
+请阅读 [v1.2.2 升级指引](upgrading-to-1.2.2.md)，调整退出确认、精确回调、资源服务器查询权限及历史授权处置。

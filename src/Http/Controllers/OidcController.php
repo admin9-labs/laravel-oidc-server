@@ -8,14 +8,18 @@ use Admin9\OidcServer\Contracts\OidcUserInterface;
 use Admin9\OidcServer\Events\OidcLogoutInitiated;
 use Admin9\OidcServer\Events\OidcUserInfoRequested;
 use Admin9\OidcServer\Services\ClaimsService;
-use Defuse\Crypto\Crypto;
+use Admin9\OidcServer\Services\PassportKeys;
+use Admin9\OidcServer\Services\TokenVerifier;
+use Illuminate\Contracts\Hashing\Hasher;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Laravel\Passport\Client;
+use Laravel\Passport\Passport;
 use Laravel\Passport\RefreshToken;
 use Laravel\Passport\Token;
+use Symfony\Component\HttpFoundation\Response;
 
 class OidcController extends Controller
 {
@@ -42,13 +46,13 @@ class OidcController extends Controller
             'introspection_endpoint' => $issuer.'/oauth/introspect',
             'revocation_endpoint' => $issuer.'/oauth/revoke',
             'post_logout_redirect_uris_supported' => config('oidc-server.post_logout_redirect_uris_supported'),
-            'response_types_supported' => config('oidc-server.response_types_supported'),
+            'response_types_supported' => ['code'],
             'subject_types_supported' => config('oidc-server.subject_types_supported'),
             'id_token_signing_alg_values_supported' => config('oidc-server.id_token_signing_alg_values_supported'),
             'scopes_supported' => array_keys(config('oidc-server.scopes')),
             'token_endpoint_auth_methods_supported' => config('oidc-server.token_endpoint_auth_methods_supported'),
             'claims_supported' => $this->claimsService->getSupportedClaims(),
-            'code_challenge_methods_supported' => config('oidc-server.code_challenge_methods_supported'),
+            'code_challenge_methods_supported' => ['S256'],
             'grant_types_supported' => config('oidc-server.grant_types_supported'),
             'introspection_endpoint_auth_methods_supported' => config('oidc-server.token_endpoint_auth_methods_supported'),
             'revocation_endpoint_auth_methods_supported' => config('oidc-server.token_endpoint_auth_methods_supported'),
@@ -66,16 +70,15 @@ class OidcController extends Controller
      */
     public function jwks(): JsonResponse
     {
-        $publicKeyPath = storage_path('oauth-public.key');
-
-        if (! file_exists($publicKeyPath)) {
+        try {
+            $publicKey = app(PassportKeys::class)->key('public')->contents();
+        } catch (\Throwable) {
             return response()->json([
                 'error' => 'Public key not found',
                 'error_description' => 'The OAuth public key has not been generated.',
             ], 500);
         }
 
-        $publicKey = file_get_contents($publicKeyPath);
         $keyResource = openssl_pkey_get_public($publicKey);
 
         if ($keyResource === false) {
@@ -139,339 +142,329 @@ class OidcController extends Controller
      */
     public function introspect(Request $request): JsonResponse
     {
-        $client = $this->authenticateClient($request);
+        $client = $this->authenticateClient($request, true);
         if (! $client) {
-            return response()->json([
-                'error' => 'invalid_client',
-                'error_description' => 'Client authentication failed.',
-            ], 401);
+            return response()->json(['error' => 'invalid_client', 'error_description' => 'Client authentication failed.'], 401);
         }
 
-        $token = $request->input('token');
-        $tokenTypeHint = $request->input('token_type_hint', 'access_token');
-
-        if ($tokenTypeHint && ! in_array($tokenTypeHint, ['access_token', 'refresh_token'], true)) {
-            return response()->json([
-                'error' => 'unsupported_token_type',
-                'error_description' => 'token_type_hint must be access_token or refresh_token.',
-            ], 400);
-        }
-
-        if (! $token) {
+        $value = $request->input('token');
+        if (! is_string($value) || $value === '') {
             return response()->json(['active' => false]);
         }
 
-        $tokenInfo = $this->findToken($token, $tokenTypeHint);
-
-        if (! $tokenInfo) {
+        $token = $this->findToken($value, $request->input('token_type_hint'), true);
+        $owner = $token instanceof RefreshToken ? $token->accessToken : $token;
+        if (! $owner || ! $this->mayIntrospect($client, $owner)) {
             return response()->json(['active' => false]);
         }
 
-        return response()->json($tokenInfo);
+        if ($token instanceof RefreshToken) {
+            return response()->json([
+                'active' => true,
+                'token_type' => 'refresh_token',
+                'client_id' => $owner->client_id,
+                'exp' => $token->expires_at->timestamp,
+            ]);
+        }
+
+        $scopes = $token->scopes ?? [];
+        $response = [
+            'active' => true,
+            'scope' => implode(' ', $scopes),
+            'client_id' => $token->client_id,
+            'token_type' => 'Bearer',
+            'exp' => $token->expires_at->timestamp,
+            'iat' => $token->created_at->timestamp,
+            'sub' => (string) $token->user_id,
+            'aud' => $token->client_id,
+            'iss' => config('oidc-server.issuer', config('app.url')),
+        ];
+        if (in_array('email', $scopes, true)) {
+            $response['username'] = $token->user?->email;
+        }
+
+        return response()->json($response);
     }
 
-    /**
-     * Token Revocation endpoint (RFC 7009)
-     *
-     * @see https://datatracker.ietf.org/doc/html/rfc7009
-     */
     public function revoke(Request $request): JsonResponse
     {
         $client = $this->authenticateClient($request);
         if (! $client) {
-            return response()->json([
-                'error' => 'invalid_client',
-                'error_description' => 'Client authentication failed.',
-            ], 401);
+            return response()->json(['error' => 'invalid_client', 'error_description' => 'Client authentication failed.'], 401);
         }
 
-        $token = $request->input('token');
-        $tokenTypeHint = $request->input('token_type_hint', 'access_token');
-
-        if ($tokenTypeHint && ! in_array($tokenTypeHint, ['access_token', 'refresh_token'], true)) {
-            return response()->json([
-                'error' => 'unsupported_token_type',
-                'error_description' => 'token_type_hint must be access_token or refresh_token.',
-            ], 400);
-        }
-
-        if (! $token) {
-            return response()->json([], 200);
-        }
-
-        $this->revokeToken($token, $tokenTypeHint, $client);
-
-        return response()->json([], 200);
-    }
-
-    /**
-     * RP-Initiated Logout endpoint
-     *
-     * @see https://openid.net/specs/openid-connect-rpinitiated-1_0.html
-     */
-    public function logout(Request $request)
-    {
-        $postLogoutRedirectUri = $request->query('post_logout_redirect_uri');
-        $idTokenHint = $request->query('id_token_hint');
-        $state = $request->query('state');
-
-        $client = null;
-        if ($idTokenHint) {
-            // Security note: We parse the id_token_hint WITHOUT signature verification.
-            // This is intentional per the OIDC RP-Initiated Logout spec — the hint is only
-            // used to identify the client for redirect URI validation, not for authentication.
-            // The actual security boundary is the post_logout_redirect_uri validation below.
-            try {
-                $parser = new \Lcobucci\JWT\Token\Parser(new \Lcobucci\JWT\Encoding\JoseEncoder);
-                /** @var \Lcobucci\JWT\Token\Plain $token */
-                $token = $parser->parse($idTokenHint);
-                $clientId = $token->claims()->get('aud');
-                if (is_array($clientId)) {
-                    $clientId = $clientId[0];
-                }
-                $client = Client::find($clientId);
-            } catch (\Exception $e) {
+        $value = $request->input('token');
+        if (is_string($value) && $value !== '') {
+            $token = $this->findToken($value, $request->input('token_type_hint'), false);
+            $access = $token instanceof RefreshToken ? $token->accessToken : $token;
+            if ($access && (string) $access->client_id === (string) $client->getKey()) {
+                $access->getConnection()->transaction(function () use ($access): void {
+                    $access->revoke();
+                    Passport::refreshToken()->newQuery()->where('access_token_id', $access->id)
+                        ->update(['revoked' => true]);
+                });
             }
         }
 
-        $guardName = config('passport.guard') ?? auth()->getDefaultDriver();
+        // Do not reveal whether a submitted token exists or belongs to another client.
+        return response()->json([]);
+    }
+
+    public function logout(Request $request): Response
+    {
+        if ($request->isMethod('HEAD')) {
+            return response('', 200);
+        }
+
+        $parameters = $this->logoutParameters($request);
+        if ($parameters === null) {
+            return response()->json(['error' => 'invalid_request'], 400);
+        }
+
+        [$client, $matchesUser] = $this->logoutClient($parameters);
+        $redirect = $this->logoutRedirect($parameters['post_logout_redirect_uri'], $client);
+        if (($parameters['id_token_hint'] !== null || $parameters['client_id'] !== null) && ! $client) {
+            $redirect = null;
+        }
+
+        if ($matchesUser) {
+            return $this->finishLogout($request, $client, $redirect, $parameters['state']);
+        }
+
+        $challenge = Str::random(64);
+        $request->session()->put('oidc.logout_pending', [
+            'challenge' => $challenge,
+            'identity' => $this->logoutIdentity(),
+            'client_id' => $client?->getKey(),
+            'redirect' => $redirect,
+            'state' => $parameters['state'],
+            'expires_at' => time() + 300,
+        ]);
+
+        return response()->view('oidc-server::logout', ['challenge' => $challenge])
+            ->header('Cache-Control', 'no-store')
+            ->header('Referrer-Policy', 'no-referrer');
+    }
+
+    public function confirmLogout(Request $request): Response
+    {
+        $pending = $request->session()->pull('oidc.logout_pending');
+        $challenge = $request->input('confirmation');
+        if (! is_array($pending) || ! is_string($challenge)
+            || ! hash_equals($pending['challenge'], $challenge)
+            || $pending['expires_at'] < time()
+            || $pending['identity'] !== $this->logoutIdentity()) {
+            return response()->json(['error' => 'invalid_request'], 400);
+        }
+
+        $client = $pending['client_id'] === null ? null : Passport::client()->find($pending['client_id']);
+        $redirect = $this->logoutRedirect($pending['redirect'], $client);
+        if ($pending['client_id'] !== null && (! $client || $client->revoked)) {
+            $redirect = null;
+        }
+
+        return $this->finishLogout($request, $client, $redirect, $pending['state']);
+    }
+
+    protected function logoutParameters(Request $request): ?array
+    {
+        // Preserve protocol strings before Laravel's TrimStrings normalization.
+        parse_str((string) $request->server('QUERY_STRING', ''), $input);
+        if ($request->isMethod('POST')) {
+            if (str_starts_with(strtolower($request->header('Content-Type', '')), 'multipart/form-data')) {
+                // OIDC uses URL-encoded form serialization. Multipart input may
+                // already have been normalized by PHP/Laravel before we can compare it.
+                return null;
+            }
+            $content = $request->getContent();
+            if ($request->isJson()) {
+                try {
+                    $body = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
+                } catch (\JsonException) {
+                    return null;
+                }
+                if (! is_array($body)) {
+                    return null;
+                }
+            } elseif ($content !== '') {
+                parse_str($content, $body);
+            } else {
+                $body = $request->request->all();
+            }
+            $input = $body + $input;
+        }
+        $parameters = [];
+        foreach (['id_token_hint', 'client_id', 'post_logout_redirect_uri', 'state'] as $name) {
+            $value = $input[$name] ?? null;
+            if ($value !== null && (! is_string($value) || strlen($value) > 16384)) {
+                return null;
+            }
+            $parameters[$name] = $value;
+        }
+
+        return $parameters;
+    }
+
+    protected function logoutClient(array $parameters): array
+    {
+        if ($parameters['id_token_hint'] === null) {
+            $client = $parameters['client_id'] === null ? null : Passport::client()->find($parameters['client_id']);
+
+            return [$client && ! $client->revoked ? $client : null, false];
+        }
+
+        $jwt = app(TokenVerifier::class)->signedJwt($parameters['id_token_hint']);
+        if (! $jwt) {
+            return [null, false];
+        }
+
+        $claims = $jwt->claims();
+        $audience = $claims->get('aud');
+        if ($jwt->headers()->get('typ') !== 'JWT'
+            || $claims->get('iss') !== config('oidc-server.issuer', config('app.url'))
+            || ! is_array($audience) || count($audience) !== 1 || ! is_string($audience[0])
+            || ! is_string($claims->get('sub')) || $claims->get('sub') === ''
+            || ! $claims->get('iat') instanceof \DateTimeImmutable
+            || ! $claims->get('exp') instanceof \DateTimeImmutable
+            || $claims->has('scopes') || $claims->has('jti')
+            || ($parameters['client_id'] !== null && $parameters['client_id'] !== $audience[0])
+            || ($claims->has('azp') && $claims->get('azp') !== $audience[0])) {
+            return [null, false];
+        }
+
+        $client = Passport::client()->find($audience[0]);
+        if (! $client || $client->revoked) {
+            return [null, false];
+        }
+
+        $user = auth()->guard($this->logoutGuard())->user();
+        $now = new \DateTimeImmutable;
+        $matchesUser = $user instanceof OidcUserInterface
+            && $claims->get('sub') === $user->getOidcSubject()
+            && ! $claims->has('sid')
+            && $claims->get('iat') <= $now && $claims->get('exp') > $now
+            && (! $claims->has('nbf') || $claims->get('nbf') <= $now);
+
+        // Expired hints can identify the RP for confirmation, never silently end a session.
+        return [$client, $matchesUser];
+    }
+
+    protected function logoutGuard(): string
+    {
+        return config('passport.guard') ?? auth()->getDefaultDriver();
+    }
+
+    protected function logoutIdentity(): array
+    {
+        $guard = $this->logoutGuard();
+        $user = auth()->guard($guard)->user();
+
+        return [$guard, $user ? get_class($user) : null, $user ? (string) $user->getAuthIdentifier() : null];
+    }
+
+    protected function logoutRedirect(?string $uri, ?Client $client): ?string
+    {
+        if ($uri === null || $uri === '' || preg_match('/[\x00-\x20\x7f\\\\]/', $uri)) {
+            return null;
+        }
+
+        if ($client) {
+            if ($client->revoked) {
+                return null;
+            }
+            $registered = config('oidc-server.post_logout_redirect_uris', [])[(string) $client->getKey()] ?? null;
+            if ($registered === null) {
+                $registered = $client->redirect_uris ?? explode(',', (string) $client->redirect);
+            }
+        } else {
+            $registered = config('oidc-server.post_logout_redirect_uris_supported', []);
+        }
+
+        return is_array($registered) && in_array($uri, $registered, true) ? $uri : null;
+    }
+
+    protected function finishLogout(Request $request, ?Client $client, ?string $redirect, ?string $state): Response
+    {
+        $guardName = $this->logoutGuard();
         $guard = auth()->guard($guardName);
-
-        OidcLogoutInitiated::dispatch(
-            $guard->id(),
-            $client?->id,
-        );
-
+        OidcLogoutInitiated::dispatch($guard->id(), $client?->getKey());
         $guard->logout();
         $request->session()->forget([
-            'authToken',
-            'authRequest',
-            'promptedForLogin',
-            'password_hash_'.$guardName,
-            'auth.password_confirmed_at',
+            'authToken', 'authRequest', 'promptedForLogin', 'oidc.logout_pending', 'oidc.authorization_pending',
+            'password_hash_'.$guardName, 'auth.password_confirmed_at',
         ]);
         $request->session()->regenerate(true);
 
-        if ($postLogoutRedirectUri) {
-            $isValid = false;
-
-            if ($client) {
-                $allowedUris = $client->redirect_uris ?? [];
-                $isValid = $this->isValidPostLogoutUri($postLogoutRedirectUri, $allowedUris);
-            } else {
-                $isValid = $this->isValidPostLogoutUri($postLogoutRedirectUri, [config('app.url')]);
-            }
-
-            if ($isValid) {
-                $url = $postLogoutRedirectUri;
-                if ($state) {
-                    $url .= (str_contains($url, '?') ? '&' : '?').'state='.urlencode($state);
-                }
-
-                return redirect($url);
+        if ($redirect === null) {
+            return redirect('/')->header('Cache-Control', 'no-store');
+        }
+        if ($state !== null && $state !== '') {
+            [$base, $fragment] = array_pad(explode('#', $redirect, 2), 2, null);
+            $redirect = $base.(str_contains($base, '?') ? '&' : '?').'state='.rawurlencode($state);
+            if ($fragment !== null) {
+                $redirect .= '#'.$fragment;
             }
         }
 
-        return redirect('/');
+        return redirect($redirect)->header('Cache-Control', 'no-store');
     }
 
-    protected function authenticateClient(Request $request): ?Client
+    protected function authenticateClient(Request $request, bool $requireConfidential = false): ?Client
     {
-        $clientId = null;
-        $clientSecret = null;
-
+        $clientId = $request->input('client_id');
+        $secret = $request->input('client_secret');
         if ($request->headers->has('Authorization')) {
-            $authHeader = $request->headers->get('Authorization');
-            if (str_starts_with($authHeader, 'Basic ')) {
-                $decoded = base64_decode(substr($authHeader, 6), true);
-                if ($decoded !== false && str_contains($decoded, ':')) {
-                    [$clientId, $clientSecret] = explode(':', $decoded, 2);
-                    $clientId = urldecode($clientId);
-                    $clientSecret = urldecode($clientSecret);
-                }
-            }
-        }
-
-        if (! $clientId) {
-            $clientId = $request->input('client_id');
-            $clientSecret = $request->input('client_secret');
-        }
-
-        if (! $clientId) {
-            return null;
-        }
-
-        $client = Client::find($clientId);
-
-        if (! $client) {
-            return null;
-        }
-
-        if ($client->confidential() && ! Hash::check($clientSecret, $client->secret)) {
-            return null;
-        }
-
-        return $client;
-    }
-
-    protected function findToken(string $token, string $tokenTypeHint): ?array
-    {
-        if ($tokenTypeHint === 'access_token' || $tokenTypeHint === '') {
-            $tokenId = $this->extractAccessTokenId($token);
-
-            if (! $tokenId) {
+            $header = $request->header('Authorization');
+            if (! preg_match('/^Basic ([A-Za-z0-9+\/]+=*)$/iD', $header, $matches)
+                || ($decoded = base64_decode($matches[1], true)) === false
+                || ! str_contains($decoded, ':')) {
                 return null;
             }
-
-            $accessToken = Token::find($tokenId);
-
-            if ($accessToken && ! $accessToken->revoked) {
-                $expiresAt = $accessToken->expires_at;
-                $isActive = $expiresAt && $expiresAt->isFuture();
-
-                if ($isActive) {
-                    $user = $accessToken->user;
-
-                    return [
-                        'active' => true,
-                        'scope' => implode(' ', $accessToken->scopes ?? []),
-                        'client_id' => $accessToken->client_id,
-                        'username' => $user?->email,
-                        'token_type' => 'Bearer',
-                        'exp' => $expiresAt->timestamp,
-                        'iat' => $accessToken->created_at->timestamp,
-                        'sub' => (string) $accessToken->user_id,
-                        'aud' => $accessToken->client_id,
-                        'iss' => config('oidc-server.issuer', config('app.url')),
-                    ];
-                }
+            [$clientId, $secret] = array_map('urldecode', explode(':', $decoded, 2));
+            if ($request->has('client_id') || $request->has('client_secret')) {
+                return null;
             }
         }
 
-        if ($tokenTypeHint === 'refresh_token') {
-            $refreshToken = RefreshToken::where('id', $token)->first();
-
-            if ($refreshToken && ! $refreshToken->revoked) {
-                $expiresAt = $refreshToken->expires_at;
-                $isActive = $expiresAt && $expiresAt->isFuture();
-
-                if ($isActive) {
-                    return [
-                        'active' => true,
-                        'token_type' => 'refresh_token',
-                        'exp' => $expiresAt->timestamp,
-                        'client_id' => $refreshToken->access_token?->client_id,
-                    ];
-                }
-            }
-        }
-
-        return null;
-    }
-
-    protected function revokeToken(string $token, string $tokenTypeHint, Client $client): void
-    {
-        $revoked = false;
-
-        if ($tokenTypeHint === 'refresh_token' || $tokenTypeHint === '') {
-            $tokenId = $this->extractRefreshTokenId($token);
-            if ($tokenId) {
-                $refreshToken = RefreshToken::where('id', $tokenId)->first();
-                if ($refreshToken && $refreshToken->accessToken?->client_id === $client->id) {
-                    $refreshToken->update(['revoked' => true]);
-                    $refreshToken->accessToken?->revoke();
-                    $revoked = true;
-                }
-            }
-        }
-
-        if (! $revoked && ($tokenTypeHint === 'access_token' || $tokenTypeHint === '')) {
-            $tokenId = $this->extractAccessTokenId($token);
-            if ($tokenId) {
-                $accessToken = Token::where('id', $tokenId)
-                    ->where('client_id', $client->id)
-                    ->first();
-
-                if ($accessToken) {
-                    $accessToken->revoke();
-                    RefreshToken::where('access_token_id', $accessToken->id)
-                        ->update(['revoked' => true]);
-                    $revoked = true;
-                }
-            }
-        }
-
-    }
-
-    protected function extractAccessTokenId(string $token): ?string
-    {
-        try {
-            if (str_contains($token, '.')) {
-                $parser = new \Lcobucci\JWT\Token\Parser(new \Lcobucci\JWT\Encoding\JoseEncoder);
-                /** @var \Lcobucci\JWT\Token\Plain $jwt */
-                $jwt = $parser->parse($token);
-
-                return $jwt->claims()->get('jti');
-            }
-
-            return $token;
-        } catch (\Exception $e) {
+        if ((! is_string($clientId) && ! is_int($clientId)) || (string) $clientId === '') {
             return null;
         }
-    }
-
-    protected function extractRefreshTokenId(string $token): ?string
-    {
-        try {
-            $key = config('app.key');
-            if (str_starts_with($key, 'base64:')) {
-                $key = base64_decode(substr($key, 7));
-            }
-
-            $decrypted = Crypto::decryptWithPassword($token, $key);
-            $payload = json_decode($decrypted, true);
-
-            return $payload['refresh_token_id'] ?? null;
-        } catch (\Exception $e) {
-            if (strlen($token) === 80 && ! str_contains($token, '.')) {
-                return $token;
-            }
-
+        $client = Passport::client()->find($clientId);
+        if (! $client || $client->revoked) {
             return null;
         }
+        if (! $client->confidential()) {
+            return $requireConfidential ? null : $client;
+        }
+        if (! is_string($secret) || $secret === '') {
+            return null;
+        }
+
+        if (property_exists(Passport::class, 'hashesClientSecrets')) {
+            $valid = Passport::$hashesClientSecrets
+                ? password_verify($secret, $client->secret)
+                : hash_equals($client->secret, $secret);
+        } else {
+            $valid = app(Hasher::class)->check($secret, $client->secret);
+        }
+
+        return $valid ? $client : null;
     }
 
-    protected function isValidPostLogoutUri(string $uri, array $allowedUris): bool
+    protected function findToken(string $value, mixed $hint, bool $activeOnly): Token|RefreshToken|null
     {
-        $uriParsed = parse_url($uri);
+        $verifier = app(TokenVerifier::class);
+        // A hint is an optimization, not a restriction, including unknown hints.
+        return $hint === 'refresh_token'
+            ? ($verifier->refreshToken($value, $activeOnly) ?? $verifier->accessToken($value, $activeOnly))
+            : ($verifier->accessToken($value, $activeOnly) ?? $verifier->refreshToken($value, $activeOnly));
+    }
 
-        if (! isset($uriParsed['scheme'], $uriParsed['host'])) {
-            return false;
-        }
-
-        foreach ($allowedUris as $allowed) {
-            $allowedParsed = parse_url(trim($allowed));
-
-            if (! isset($allowedParsed['scheme'], $allowedParsed['host'])) {
-                continue;
-            }
-
-            $schemeMatch = strtolower($uriParsed['scheme']) === strtolower($allowedParsed['scheme']);
-            $hostMatch = strtolower($uriParsed['host']) === strtolower($allowedParsed['host']);
-            $portMatch = ($uriParsed['port'] ?? null) === ($allowedParsed['port'] ?? null);
-
-            if ($schemeMatch && $hostMatch && $portMatch) {
-                $allowedPath = rtrim($allowedParsed['path'] ?? '/', '/');
-                $uriPath = $uriParsed['path'] ?? '/';
-
-                // Exact match or the URI path starts with the allowed path followed by /
-                if ($allowedPath === '' || $uriPath === $allowedPath || str_starts_with($uriPath, $allowedPath.'/')) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
+    protected function mayIntrospect(Client $client, Token $token): bool
+    {
+        return (string) $client->getKey() === (string) $token->client_id
+            || in_array((string) $token->client_id,
+                config('oidc-server.introspection_allowed_clients', [])[(string) $client->getKey()] ?? [], true);
     }
 
     protected function base64UrlEncode(string $data): string

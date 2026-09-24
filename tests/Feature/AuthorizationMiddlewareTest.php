@@ -26,6 +26,6 @@ class AuthorizationMiddlewareTest extends TestCase
         $this->deleteJson('/oauth/authorize')->assertUnauthorized();
         $this->getJson('/.well-known/openid-configuration')->assertOk();
         $this->getJson('/.well-known/jwks.json')->assertOk()->assertJsonStructure(['keys']);
-        $this->get('/oauth/logout')->assertRedirect('/');
+        $this->get('/oauth/logout')->assertOk();
     }
 }

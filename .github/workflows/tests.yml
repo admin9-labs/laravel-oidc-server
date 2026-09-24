@@ -7,7 +7,7 @@ on:
 
 jobs:
   tests:
-    name: PHP ${{ matrix.php }} / Laravel ${{ matrix.laravel_name }}
+    name: PHP ${{ matrix.php }} / Laravel ${{ matrix.laravel_name }} / Passport ${{ matrix.passport }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -17,6 +17,15 @@ jobs:
           - php: '8.2'
             laravel_name: '11'
             laravel: '^11.35'
+            passport: '^12.0'
+            testbench: '^9.15'
+            pest: '^3.0'
+            phpunit: '^11.0'
+            allow_insecure_framework_solve: true
+          - php: '8.2'
+            laravel_name: '11'
+            laravel: '^11.35'
+            passport: '^13.0'
             testbench: '^9.15'
             pest: '^3.0'
             phpunit: '^11.0'
@@ -24,6 +33,15 @@ jobs:
           - php: '8.2'
             laravel_name: '12'
             laravel: '^12.0'
+            passport: '^12.0'
+            testbench: '^10.0'
+            pest: '^3.0'
+            phpunit: '^11.0'
+            allow_insecure_framework_solve: false
+          - php: '8.2'
+            laravel_name: '12'
+            laravel: '^12.0'
+            passport: '^13.0'
             testbench: '^10.0'
             pest: '^3.0'
             phpunit: '^11.0'
@@ -31,6 +49,15 @@ jobs:
           - php: '8.3'
             laravel_name: '12'
             laravel: '^12.0'
+            passport: '^12.0'
+            testbench: '^10.0'
+            pest: '^3.0'
+            phpunit: '^11.0'
+            allow_insecure_framework_solve: false
+          - php: '8.3'
+            laravel_name: '12'
+            laravel: '^12.0'
+            passport: '^13.0'
             testbench: '^10.0'
             pest: '^3.0'
             phpunit: '^11.0'
@@ -38,6 +65,7 @@ jobs:
           - php: '8.3'
             laravel_name: '13'
             laravel: '^13.0'
+            passport: '^13.0'
             testbench: '^11.0'
             pest: '^4.0'
             phpunit: '^12.0'
@@ -62,6 +90,7 @@ jobs:
         run: |
           composer update \
             --with laravel/framework:${{ matrix.laravel }} \
+            --with laravel/passport:${{ matrix.passport }} \
             --with orchestra/testbench:${{ matrix.testbench }} \
             --with pestphp/pest:${{ matrix.pest }} \
             --with phpunit/phpunit:${{ matrix.phpunit }} \

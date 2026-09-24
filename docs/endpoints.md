@@ -13,7 +13,7 @@ This document provides detailed information about all HTTP endpoints provided by
 | 5 | `GET\|POST` | `/oauth/userinfo` | UserInfo | Bearer token |
 | 6 | `POST` | `/oauth/introspect` | Token Introspection | Client credentials |
 | 7 | `POST` | `/oauth/revoke` | Token Revocation | Client credentials |
-| 8 | `GET` | `/oauth/logout` | RP-Initiated Logout | None (optional `id_token_hint`) |
+| 8 | `GET`, `POST` | `/oauth/logout` | RP-Initiated Logout | None (optional `id_token_hint`) |
 
 ---
 
@@ -47,14 +47,14 @@ Host: your-app.example.com
   "end_session_endpoint": "https://your-app.example.com/oauth/logout",
   "introspection_endpoint": "https://your-app.example.com/oauth/introspect",
   "revocation_endpoint": "https://your-app.example.com/oauth/revoke",
-  "response_types_supported": ["code", "token"],
+  "response_types_supported": ["code"],
   "subject_types_supported": ["public"],
   "id_token_signing_alg_values_supported": ["RS256"],
   "scopes_supported": ["openid", "profile", "email"],
   "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
-  "claims_supported": ["sub", "iss", "aud", "exp", "iat", "auth_time", "name", "nickname", "picture", "updated_at", "email", "email_verified"],
-  "code_challenge_methods_supported": ["S256", "plain"],
-  "grant_types_supported": ["authorization_code", "refresh_token", "client_credentials", "urn:ietf:params:oauth:grant-type:device_code"],
+  "claims_supported": ["sub", "iss", "aud", "exp", "iat", "nonce", "name", "nickname", "picture", "updated_at", "email", "email_verified"],
+  "code_challenge_methods_supported": ["S256"],
+  "grant_types_supported": ["authorization_code", "refresh_token", "client_credentials"],
   "introspection_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
   "revocation_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
   "post_logout_redirect_uris_supported": []
@@ -136,8 +136,9 @@ Host: your-app.example.com
 | `scope` | Recommended | Space-separated list of scopes (e.g., `openid profile email`) |
 | `state` | Recommended | Opaque value for CSRF protection, returned unchanged |
 | `code_challenge` | Recommended | PKCE code challenge (required when using PKCE) |
-| `code_challenge_method` | Recommended | `S256` (recommended) or `plain` |
-| `nonce` | Optional | Value passed through to the ID token for replay protection |
+| `code_challenge_method` | Required with `code_challenge` | Must be `S256`; `plain` is rejected |
+| `nonce` | Optional | Exact value bound to the authorization code and initial ID Token; token requests cannot replace it |
+| `max_age` | Unsupported | Any occurrence returns invalid_request to the validated callback; no login is started |
 
 ### Response (redirect)
 
@@ -150,7 +151,7 @@ Location: https://client.example.com/callback?code=def50200abc...&state=random-c
 
 ## 4. Token Endpoint
 
-Exchanges an authorization code (or refresh token) for an access token. When the `openid` scope is present, an `id_token` (signed JWT) is automatically included in the response.
+Exchanges an authorization code (or refresh token) for an access token. An `id_token` is included when `openid` was granted and the token carries the package's validated OIDC authorization context. Legacy refresh tokens continue issuing OAuth tokens without an ID Token; see [upgrade compatibility](upgrading-to-1.2.2.md#nonce-and-authentication-freshness).
 
 - **Method:** `POST`
 - **Path:** `/oauth/token`
@@ -158,7 +159,7 @@ Exchanges an authorization code (or refresh token) for an access token. When the
 - **Middleware:** Configurable via `oidc-server.routes.token_middleware`
 - **Spec:** [RFC 6749 Section 4.1.3](https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3), [OpenID Connect Core 1.0 Section 3.1.3](https://openid.net/specs/openid-connect-core-1_0.html#TokenEndpoint)
 
-This endpoint is provided by Laravel Passport's built-in `AccessTokenController`. The package injects a custom `TokenResponseType` that appends the `id_token` field when the `openid` scope was granted.
+This endpoint uses Passport's built-in `AccessTokenController` and the package's `TokenResponseType`. Nonce comes only from the original authorization code. All ID Tokens omit `auth_time`; refresh also omits nonce. Essential auth_time requests through claims are rejected rather than silently satisfied. No token request parameter can supply either claim.
 
 ### Request (Authorization Code Grant)
 
@@ -201,7 +202,7 @@ grant_type=refresh_token
 }
 ```
 
-> The `id_token` field is only present when the `openid` scope was included in the original authorization request. The ID token is a signed JWT containing claims such as `sub`, `iss`, `aud`, `exp`, `iat`, `auth_time`, and `nonce`, plus any additional claims resolved from the granted scopes (e.g., `name`, `email`).
+> The `id_token` field is only present when the `openid` scope was included in the original authorization request. The ID token is a signed JWT containing claims such as `sub`, `iss`, `aud`, `exp`, `iat`, and `nonce`, plus any additional claims resolved from the granted scopes (e.g., `name`, `email`).
 
 ---
 
@@ -253,6 +254,8 @@ HTTP/1.1 401 Unauthorized
 ---
 
 ## 6. Token Introspection
+
+Requires active confidential-client authentication and defaults to the caller's own tokens. Configure `introspection_allowed_clients` for additional resource-server permissions. `username` requires `email` scope. Missing or incorrect token_type_hint does not restrict lookup.
 
 Allows a client to determine whether an access token or refresh token is currently active and retrieve metadata about it.
 
@@ -381,12 +384,12 @@ HTTP/1.1 401 Unauthorized
 
 ## 8. RP-Initiated Logout
 
-Allows a Relying Party (client application) to log the user out of the OpenID Provider. The server logs out `passport.guard`, clears pending Passport authorization state, that guard's session password hash, and the shared password-confirmation timestamp, rotates the session ID and CSRF token, and optionally redirects to a post-logout URI. Other guards' login state and unrelated session data are preserved.
+Allows a Relying Party (client application) to log the user out of the OpenID Provider. After a validated matching hint or local confirmation, the server logs out `passport.guard`, clears pending Passport authorization state, that guard's session password hash, and the shared password-confirmation timestamp, rotates the session ID and CSRF token, and optionally redirects to a post-logout URI. Other guards' login state and unrelated session data are preserved.
 
-- **Method:** `GET`
+- **Method:** `GET`, `POST`
 - **Path:** `/oauth/logout`
-- **Authentication:** None required (optional `id_token_hint` for client identification)
-- **Middleware:** `web` (session and CSRF support)
+- **Authentication:** A valid current-user `id_token_hint` for direct logout; otherwise local confirmation
+- **Middleware:** Protocol entry uses web sessions with a CSRF exemption; the local confirmation endpoint retains CSRF
 - **Spec:** [OpenID Connect RP-Initiated Logout 1.0](https://openid.net/specs/openid-connect-rpinitiated-1_0.html)
 
 ### Request
@@ -418,7 +421,7 @@ HTTP/1.1 302 Found
 Location: /
 ```
 
-> The `post_logout_redirect_uri` is validated against the client's registered redirect URIs (when `id_token_hint` is provided) or against the application URL. If validation fails, the user is redirected to the application root (`/`).
+> A verified, unexpired ID Token hint must match the current guard user's OIDC subject, issuer and active client audience for direct logout. Otherwise the endpoint returns a confirmation page (200). Its POST `/oauth/logout/confirm` requires CSRF and a one-use server-side challenge. HEAD does not log out. Complete redirect URI strings must exactly match the selected client's registration or, for local confirmed logout without a client, the global list. No same-origin fallback applies. See [upgrade details](upgrading-to-1.2.2.md).
 
 ---
 

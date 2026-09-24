@@ -7,9 +7,12 @@ namespace Admin9\OidcServer\Tests\Unit;
 use Admin9\OidcServer\Contracts\OidcUserInterface;
 use Admin9\OidcServer\Concerns\HasOidcClaims;
 use Admin9\OidcServer\Events\OidcTokenIssued;
+use Admin9\OidcServer\Services\AuthorizationContext;
 use Admin9\OidcServer\Services\IdTokenService;
+use Admin9\OidcServer\Services\PassportKeys;
 use Admin9\OidcServer\Services\TokenResponseType;
 use Admin9\OidcServer\Tests\TestCase;
+use Defuse\Crypto\Crypto;
 use Illuminate\Support\Facades\Event;
 use League\OAuth2\Server\Entities\AccessTokenEntityInterface;
 use League\OAuth2\Server\Entities\ClientEntityInterface;
@@ -30,6 +33,7 @@ class TokenResponseTypeTest extends TestCase
         TokenResponseType $responseType,
         AccessTokenEntityInterface $accessToken
     ): array {
+        $responseType->setAccessToken($accessToken);
         $method = new \ReflectionMethod(TokenResponseType::class, 'getExtraParams');
         $method->setAccessible(true);
 
@@ -68,9 +72,15 @@ class TokenResponseTypeTest extends TestCase
 
     public function test_returns_empty_array_when_user_not_found(): void
     {
-        $idTokenService = $this->createStub(IdTokenService::class);
+        $idTokenService = $this->createMock(IdTokenService::class);
+        $idTokenService->expects($this->never())->method('generateToken');
         $responseType = new TokenResponseType($idTokenService);
 
+        $user = TokenResponseTestUser::forceCreate([
+            'name' => 'Test User',
+            'email' => 'test@example.com',
+            'password' => bcrypt('password'),
+        ]);
         config(['oidc-server.user_model' => TokenResponseTestUser::class]);
 
         $client = $this->createStub(ClientEntityInterface::class);
@@ -80,8 +90,27 @@ class TokenResponseTypeTest extends TestCase
         $accessToken->method('getScopes')->willReturn([
             $this->createScopeMock('openid'),
         ]);
-        $accessToken->method('getUserIdentifier')->willReturn('9999');
+        $accessToken->method('getIdentifier')->willReturn('test-access-token');
+        $accessToken->method('getUserIdentifier')->willReturn((string) $user->id);
         $accessToken->method('getClient')->willReturn($client);
+
+        $context = [
+            'v' => AuthorizationContext::VERSION, 'nonce' => null,
+            'identity' => ['web', TokenResponseTestUser::class, (string) $user->id],
+            'client_id' => 'test-client', 'iss' => config('oidc-server.issuer'),
+            'sub' => $user->getOidcSubject(),
+        ];
+        request()->merge([
+            'grant_type' => 'authorization_code',
+            'code' => Crypto::encryptWithPassword(json_encode([
+                'client_id' => 'test-client', 'user_id' => (string) $user->id, 'oidc' => $context,
+            ], JSON_THROW_ON_ERROR), app(PassportKeys::class)->encryptionKey()),
+        ]);
+        $this->assertSame($context, app(AuthorizationContext::class)->forToken($accessToken));
+
+        // Context is cached while building the refresh envelope, before the ID Token user lookup.
+        $user->delete();
+        $this->assertSame($context, app(AuthorizationContext::class)->forToken($accessToken));
 
         $result = $this->callGetExtraParams($responseType, $accessToken);
 
@@ -116,6 +145,13 @@ class TokenResponseTypeTest extends TestCase
         $idTokenService->expects($this->once())
             ->method('generateToken')
             ->willReturn('mock.id.token');
+
+        $context = $this->createStub(\Admin9\OidcServer\Services\AuthorizationContext::class);
+        $context->method('forToken')->willReturn([
+            'v' => 2, 'identity' => ['web', TokenResponseTestUser::class, (string) $user->id],
+            'iss' => config('oidc-server.issuer'), 'sub' => $user->getOidcSubject(),
+        ]);
+        $this->app->instance(\Admin9\OidcServer\Services\AuthorizationContext::class, $context);
 
         $responseType = new TokenResponseType($idTokenService);
 

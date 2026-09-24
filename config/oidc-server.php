@@ -63,8 +63,8 @@ return [
     | Client Model
     |--------------------------------------------------------------------------
     |
-    | The Passport Client model class. The default OidcClient skips the
-    | authorization prompt for first-party clients.
+    | The Passport Client model class. The default always requires consent;
+    | client ownership and existing tokens are not evidence of explicit consent.
     |
     */
     'client_model' => \Admin9\OidcServer\Models\OidcClient::class,
@@ -147,7 +147,6 @@ return [
     */
     'response_types_supported' => [
         'code',
-        'token',
     ],
 
     /*
@@ -159,7 +158,6 @@ return [
         'authorization_code',
         'refresh_token',
         'client_credentials',
-        'urn:ietf:params:oauth:grant-type:device_code',
     ],
 
     /*
@@ -197,7 +195,6 @@ return [
     */
     'code_challenge_methods_supported' => [
         'S256',
-        'plain',
     ],
 
     /*
@@ -206,6 +203,16 @@ return [
     |--------------------------------------------------------------------------
     */
     'post_logout_redirect_uris_supported' => [],
+
+    // Optional per-client logout URIs. Otherwise the client's OAuth redirect URIs
+    // are reused with exact matching. The global list above is only for local,
+    // confirmed logout without a client.
+    'post_logout_redirect_uris' => [],
+
+    // Explicitly authorize a confidential resource server to inspect tokens issued
+    // to additional clients: caller client ID => [token-owning client ID, ...].
+    // This never grants permission to revoke another client's tokens.
+    'introspection_allowed_clients' => [],
 
     /*
     |--------------------------------------------------------------------------

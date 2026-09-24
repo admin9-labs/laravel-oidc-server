@@ -19,7 +19,7 @@ class ClaimsResolutionTest extends TestCase
         $this->assertContains('aud', $claims);
         $this->assertContains('exp', $claims);
         $this->assertContains('iat', $claims);
-        $this->assertContains('auth_time', $claims);
+        $this->assertNotContains('auth_time', $claims);
         $this->assertContains('name', $claims);
         $this->assertContains('email', $claims);
         $this->assertContains('email_verified', $claims);

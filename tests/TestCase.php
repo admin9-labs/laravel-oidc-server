@@ -9,6 +9,16 @@ use Orchestra\Testbench\TestCase as BaseTestCase;
 
 class TestCase extends BaseTestCase
 {
+    protected function confirmOidcLogout(string $uri = '/oauth/logout'): \Illuminate\Testing\TestResponse
+    {
+        $this->get($uri)->assertOk();
+
+        return $this->post('/oauth/logout/confirm', [
+            'confirmation' => session('oidc.logout_pending.challenge'),
+            '_token' => csrf_token(),
+        ]);
+    }
+
     protected function getPackageProviders($app): array
     {
         return [

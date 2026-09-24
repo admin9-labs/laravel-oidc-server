@@ -1,6 +1,6 @@
 # 架构
 
-本文档说明 `laravel-oidc-server` 如何将 Laravel Passport 扩展为完整的 OIDC 身份提供者。
+本文档说明 `laravel-oidc-server` 如何为 Laravel Passport 增加有明确范围的 OIDC 能力；认证新鲜度支持仍延期。
 
 ## 概述
 
@@ -90,8 +90,8 @@ JWT 配置采用延迟加载（首次使用时初始化，而非启动时）。
 | `sub` | `$user->getOidcSubject()` | 主体标识符 |
 | `iat` | Current time | 签发时间 |
 | `exp` | Access token expiry | 过期时间 |
-| `auth_time` | Current timestamp | 认证时间 |
-| `nonce` | Request parameter | 重放保护 |
+| `auth_time` | 本版省略 | 不以签发时间代替 |
+| `nonce` | 原授权码中绑定的上下文 | 原样返回；刷新时省略 |
 
 根据请求的作用域添加额外声明（详见[声明解析](claims-resolution.md)）。
 
@@ -102,12 +102,12 @@ class OidcClient extends BaseClient
 {
     public function skipsAuthorization(Authenticatable $user, array $scopes): bool
     {
-        return $this->firstParty();
+        return false;
     }
 }
 ```
 
-第一方客户端（`first_party = true`）跳过授权提示。第三方客户端显示同意屏幕。通过 `config('oidc-server.client_model')` 覆盖。
+默认客户端要求确认，已有令牌不代表历史显式授权。自定义客户端模型属于运维显式信任策略，参见[升级指引](upgrading-to-1.2.2.md)。
 
 ## 数据流
 

@@ -23,13 +23,16 @@ class IntrospectTest extends TestCase
 
     protected function createClient(array $attributes = []): Client
     {
-        return Client::forceCreate(array_merge([
+        $defaults = [
             'name' => 'Test Client',
             'secret' => 'test-secret',
-            'redirect_uris' => 'https://app.example.com/callback',
-            'grant_types' => 'authorization_code',
             'revoked' => false,
-        ], $attributes));
+        ];
+        $defaults += property_exists(\Laravel\Passport\Passport::class, 'hashesClientSecrets')
+            ? ['redirect' => 'https://app.example.com/callback', 'personal_access_client' => false, 'password_client' => false]
+            : ['redirect_uris' => ['https://app.example.com/callback'], 'grant_types' => ['authorization_code']];
+
+        return \Laravel\Passport\Passport::client()->forceCreate(array_merge($defaults, $attributes));
     }
 
     protected function createAccessToken(
@@ -55,7 +58,7 @@ class IntrospectTest extends TestCase
         $client = new \Laravel\Passport\Bridge\Client(
             (string) $token->client_id,
             'Test Client',
-            [],
+            property_exists(\Laravel\Passport\Passport::class, 'hashesClientSecrets') ? '' : [],
             true
         );
         $scopes = array_map(
@@ -68,7 +71,7 @@ class IntrospectTest extends TestCase
         $accessToken->setExpiryDateTime(DateTimeImmutable::createFromInterface($token->expires_at));
         $accessToken->setPrivateKey(new CryptKey(storage_path('oauth-private.key'), null, false));
 
-        return $accessToken->toString();
+        return method_exists($accessToken, 'toString') ? $accessToken->toString() : (string) $accessToken;
     }
 
     public function test_introspect_requires_client_authentication(): void
@@ -167,7 +170,7 @@ class IntrospectTest extends TestCase
         $response->assertJsonPath('iat', $accessToken->created_at->timestamp);
     }
 
-    public function test_introspect_returns_active_for_raw_access_token_id(): void
+    public function test_introspect_rejects_raw_access_token_id(): void
     {
         $client = $this->createClient();
         $accessToken = $this->createAccessToken($client);
@@ -180,10 +183,7 @@ class IntrospectTest extends TestCase
         ]);
 
         $response->assertOk();
-        $response->assertJson([
-            'active' => true,
-            'client_id' => $client->id,
-        ]);
+        $response->assertExactJson(['active' => false]);
     }
 
     public function test_introspect_returns_inactive_for_malformed_jwt_access_token(): void

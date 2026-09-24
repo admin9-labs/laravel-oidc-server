@@ -6,7 +6,6 @@ namespace Admin9\OidcServer\Services;
 
 use Admin9\OidcServer\Contracts\OidcUserInterface;
 use Lcobucci\JWT\Configuration;
-use Lcobucci\JWT\Signer\Key\InMemory;
 use Lcobucci\JWT\Signer\Rsa\Sha256;
 use League\OAuth2\Server\Entities\AccessTokenEntityInterface;
 use League\OAuth2\Server\Entities\ClientEntityInterface;
@@ -28,8 +27,8 @@ class IdTokenService
         if ($this->jwtConfig === null) {
             $this->jwtConfig = Configuration::forAsymmetricSigner(
                 new Sha256,
-                InMemory::file(storage_path('oauth-private.key')),
-                InMemory::file(storage_path('oauth-public.key'))
+                app(PassportKeys::class)->key('private'),
+                app(PassportKeys::class)->key('public')
             );
         }
 
@@ -54,10 +53,9 @@ class IdTokenService
             ->permittedFor($client->getIdentifier())
             ->issuedAt($now)
             ->expiresAt($accessToken->getExpiryDateTime())
-            ->relatedTo($user->getOidcSubject())
-            ->withClaim('auth_time', $now->getTimestamp());
+            ->relatedTo($user->getOidcSubject());
 
-        if ($nonce) {
+        if ($nonce !== null) {
             $builder = $builder->withClaim('nonce', $nonce);
         }
 
@@ -68,7 +66,7 @@ class IdTokenService
 
         $claims = $this->claimsService->resolveForUser($user, $scopes);
         foreach ($claims as $key => $value) {
-            if ($key !== 'sub') {
+            if (! in_array($key, ['sub', 'iss', 'aud', 'exp', 'iat', 'nbf', 'jti', 'nonce', 'auth_time'], true)) {
                 $builder = $builder->withClaim($key, $value);
             }
         }

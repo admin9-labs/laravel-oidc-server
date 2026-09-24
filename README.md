@@ -8,6 +8,8 @@
 
 OpenID Connect Server for Laravel Passport — adds OIDC Discovery, JWKS, UserInfo, Token Introspection, Token Revocation, and RP-Initiated Logout to any Laravel + Passport application.
 
+This release omits auth_time and rejects max_age / Essential auth_time requests. Full OIDC authentication freshness remains deferred; see the [upgrade guide](docs/upgrading-to-1.2.2.md).
+
 ## Requirements
 
 - PHP 8.2+
@@ -106,7 +108,7 @@ https://your-app.test/.well-known/openid-configuration
 | `/oauth/userinfo` | GET/POST | UserInfo |
 | `/oauth/introspect` | POST | Token Introspection (RFC 7662) |
 | `/oauth/revoke` | POST | Token Revocation (RFC 7009) |
-| `/oauth/logout` | GET | RP-Initiated Logout |
+| `/oauth/logout` | GET, POST | RP-Initiated Logout |
 
 ## Configuration
 
@@ -166,3 +168,7 @@ See the [Configuration Reference](docs/configuration.md) for all available optio
 ## License
 
 [MIT](LICENSE.md)
+
+## Security upgrade
+
+Read the [v1.2.2 upgrade guide](docs/upgrading-to-1.2.2.md) for logout confirmation, exact callbacks, resource-server authorization and historical-grant handling.

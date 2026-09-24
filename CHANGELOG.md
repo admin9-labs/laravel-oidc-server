@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-09-24
+
+### Security
+
+- Authenticate and authorize introspection, validate token material and client status, and preserve Passport 12/13 key and secret compatibility.
+- Separate RP logout from CSRF-protected confirmation, bind hints to the current OIDC user, and exactly match registered redirect URIs.
+- Require explicit consent by default, including historical automatic grants; enforce code/S256 at package endpoints.
+- Restrict email disclosure and remove third-party scripts from the authorization view.
+- Add security regressions and an explicit Laravel 11/12/13 and Passport 12/13 matrix.
+- Bind nonce to the original encrypted authorization code; omit auth_time and explicitly reject unsupported max_age/Essential auth_time requests. Keep prompt=login under native Passport behavior.
+- Reject pre-upgrade OIDC codes and omit ID Tokens when refreshing legacy grants without authentication context; document coordinated rollout and custom integration requirements.
+
+See the [upgrade and historical-token procedure](docs/upgrading-to-1.2.2.md).
+No database schema changes are required. Full authentication freshness and ID Token TTL activation remain
+[separate open work](docs/security-follow-ups.md).
+
 ## [1.2.0] - 2026-06-30
 
 ### Added

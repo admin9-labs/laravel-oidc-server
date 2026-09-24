@@ -13,7 +13,7 @@
 | 5 | `GET\|POST` | `/oauth/userinfo` | 用户信息 | Bearer 令牌 |
 | 6 | `POST` | `/oauth/introspect` | 令牌内省 | 客户端凭证 |
 | 7 | `POST` | `/oauth/revoke` | 令牌撤销 | 客户端凭证 |
-| 8 | `GET` | `/oauth/logout` | RP 发起的登出 | 无（可选 `id_token_hint`） |
+| 8 | `GET`, `POST` | `/oauth/logout` | RP 发起的登出 | 无（可选 `id_token_hint`） |
 
 ---
 
@@ -47,14 +47,14 @@ Host: your-app.example.com
   "end_session_endpoint": "https://your-app.example.com/oauth/logout",
   "introspection_endpoint": "https://your-app.example.com/oauth/introspect",
   "revocation_endpoint": "https://your-app.example.com/oauth/revoke",
-  "response_types_supported": ["code", "token"],
+  "response_types_supported": ["code"],
   "subject_types_supported": ["public"],
   "id_token_signing_alg_values_supported": ["RS256"],
   "scopes_supported": ["openid", "profile", "email"],
   "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
-  "claims_supported": ["sub", "iss", "aud", "exp", "iat", "auth_time", "name", "nickname", "picture", "updated_at", "email", "email_verified"],
-  "code_challenge_methods_supported": ["S256", "plain"],
-  "grant_types_supported": ["authorization_code", "refresh_token", "client_credentials", "urn:ietf:params:oauth:grant-type:device_code"],
+  "claims_supported": ["sub", "iss", "aud", "exp", "iat", "nonce", "name", "nickname", "picture", "updated_at", "email", "email_verified"],
+  "code_challenge_methods_supported": ["S256"],
+  "grant_types_supported": ["authorization_code", "refresh_token", "client_credentials"],
   "introspection_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
   "revocation_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
   "post_logout_redirect_uris_supported": []
@@ -136,8 +136,9 @@ Host: your-app.example.com
 | `scope` | 推荐 | 空格分隔的作用域列表（例如 `openid profile email`） |
 | `state` | 推荐 | 用于 CSRF 保护的不透明值，原样返回 |
 | `code_challenge` | 推荐 | PKCE 代码挑战（使用 PKCE 时必需） |
-| `code_challenge_method` | 推荐 | `S256`（推荐）或 `plain` |
-| `nonce` | 可选 | 传递到 ID 令牌的值，用于重放保护 |
+| `code_challenge_method` | 传入 `code_challenge` 时必需 | 必须为 `S256`；不接受 `plain` |
+| `nonce` | 可选 | 原样绑定到授权码及首次 ID Token；token 请求不能替换 |
+| `max_age` | 不支持 | 参数存在即向已验证回调返回 invalid_request，不启动登录 |
 
 ### 响应（重定向）
 
@@ -150,7 +151,7 @@ Location: https://client.example.com/callback?code=def50200abc...&state=random-c
 
 ## 4. 令牌端点
 
-将授权码（或刷新令牌）交换为访问令牌。当存在 `openid` 作用域时，响应中会自动包含 `id_token`（签名的 JWT）。
+将授权码（或刷新令牌）交换为访问令牌。授予 openid 且令牌带有包验证的 OIDC 授权上下文时才包含 id_token。旧 Refresh Token 继续生成 OAuth 令牌，但不返回 ID Token，参见[升级兼容策略](upgrading-to-1.2.2.md#nonce-与认证新鲜度)。
 
 - **方法：** `POST`
 - **路径：** `/oauth/token`
@@ -158,7 +159,7 @@ Location: https://client.example.com/callback?code=def50200abc...&state=random-c
 - **中间件：** 可通过 `oidc-server.routes.token_middleware` 配置
 - **规范：** [RFC 6749 Section 4.1.3](https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3)，[OpenID Connect Core 1.0 Section 3.1.3](https://openid.net/specs/openid-connect-core-1_0.html#TokenEndpoint)
 
-此端点由 Laravel Passport 内置的 `AccessTokenController` 提供。该包注入了一个自定义的 `TokenResponseType`，当授予 `openid` 作用域时，会附加 `id_token` 字段。
+此端点使用 Passport 内置 AccessTokenController 和包的 TokenResponseType。nonce 仅来自原始授权码，所有 ID Token 省略 auth_time，刷新同时省略 nonce；claims 请求 Essential auth_time 时明确拒绝。token 请求参数不能提供这两个声明。
 
 ### 请求（授权码授予）
 
@@ -201,7 +202,7 @@ grant_type=refresh_token
 }
 ```
 
-> 只有在原始授权请求中包含 `openid` 作用域时，才会出现 `id_token` 字段。ID 令牌是一个签名的 JWT，包含诸如 `sub`、`iss`、`aud`、`exp`、`iat`、`auth_time` 和 `nonce` 等声明，以及从授予的作用域解析的任何其他声明（例如 `name`、`email`）。
+> 只有在原始授权请求中包含 `openid` 作用域时，才会出现 `id_token` 字段。ID 令牌是一个签名的 JWT，包含诸如 `sub`、`iss`、`aud`、`exp`、`iat` 和 `nonce` 等声明，以及从授予的作用域解析的任何其他声明（例如 `name`、`email`）。
 
 ---
 
@@ -253,6 +254,8 @@ HTTP/1.1 401 Unauthorized
 ---
 
 ## 6. 令牌内省
+
+仅接受有效机密客户端凭证，默认查询自身令牌；额外资源服务器权限通过 `introspection_allowed_clients` 显式配置。无 `email` scope 时省略 `username`。缺失或错误的 token_type_hint 不限制实际查找。
 
 允许客户端确定访问令牌或刷新令牌当前是否处于活动状态，并检索有关它的元数据。
 
@@ -381,12 +384,12 @@ HTTP/1.1 401 Unauthorized
 
 ## 8. RP 发起的登出
 
-允许依赖方（客户端应用程序）将用户从 OpenID 提供者登出。服务器注销 `passport.guard`，清除 Passport 待确认授权状态、该 guard 的会话密码哈希及共享的密码确认时间，轮换 session ID 与 CSRF token，并可选择重定向到登出后的 URI。其他 guard 的登录状态和无关会话数据会保留。
+允许依赖方（客户端应用程序）将用户从 OpenID 提供者登出。通过匹配的有效 hint 或本地确认后，服务器注销 `passport.guard`，清除 Passport 待确认授权状态、该 guard 的会话密码哈希及共享的密码确认时间，轮换 session ID 与 CSRF token，并可选择重定向到登出后的 URI。其他 guard 的登录状态和无关会话数据会保留。
 
-- **方法：** `GET`
+- **方法：** `GET`, `POST`
 - **路径：** `/oauth/logout`
-- **认证：** 不需要（可选的 `id_token_hint` 用于客户端识别）
-- **中间件：** `web`（会话和 CSRF 支持）
+- **认证：** 直接退出需要匹配当前用户的有效 `id_token_hint`，否则显示确认页
+- **中间件：** 协议入口使用 web 会话但豁免 CSRF；本地确认端点保留 CSRF
 - **规范：** [OpenID Connect RP-Initiated Logout 1.0](https://openid.net/specs/openid-connect-rpinitiated-1_0.html)
 
 ### 请求
@@ -418,7 +421,7 @@ HTTP/1.1 302 Found
 Location: /
 ```
 
-> `post_logout_redirect_uri` 会根据客户端注册的重定向 URI（当提供 `id_token_hint` 时）或应用程序 URL 进行验证。如果验证失败，用户将被重定向到应用程序根目录（`/`）。
+> 直接退出要求未过期、验签通过的 ID Token hint 匹配当前 guard 用户 OIDC subject、issuer 和有效客户端 audience，否则返回 200 确认页。确认页 POST `/oauth/logout/confirm` 要求 CSRF 与服务端一次性确认值。HEAD 不退出。完整回调 URI 必须精确匹配该客户端登记；未指定客户端的本地确认退出使用全局列表，不再提供同域 fallback。参见[升级指引](upgrading-to-1.2.2.md)。
 
 ---
 

@@ -20,13 +20,16 @@ class RevokeTest extends TestCase
 
     protected function createClient(array $attributes = []): Client
     {
-        return Client::forceCreate(array_merge([
+        $defaults = [
             'name' => 'Test Client',
             'secret' => 'test-secret',
-            'redirect_uris' => 'https://app.example.com/callback',
-            'grant_types' => 'authorization_code',
             'revoked' => false,
-        ], $attributes));
+        ];
+        $defaults += property_exists(\Laravel\Passport\Passport::class, 'hashesClientSecrets')
+            ? ['redirect' => 'https://app.example.com/callback', 'personal_access_client' => false, 'password_client' => false]
+            : ['redirect_uris' => ['https://app.example.com/callback'], 'grant_types' => ['authorization_code']];
+
+        return \Laravel\Passport\Passport::client()->forceCreate(array_merge($defaults, $attributes));
     }
 
     public function test_revoke_requires_client_authentication(): void

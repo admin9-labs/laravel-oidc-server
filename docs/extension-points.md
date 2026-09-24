@@ -72,6 +72,8 @@ Disable auto-configuration to manage Passport yourself:
 'ignore_passport_routes' => false,
 ```
 
+For OIDC code issuance, manual configuration must install the package's `Bridge\AuthCodeGrant` and `TokenResponseType` and retain authorization-policy middleware. See the [context and upgrade contract](upgrading-to-1.2.2.md#nonce-and-authentication-freshness). Overrides of `resolveNonce()` must not restore token-body nonce handling; `generateToken()` keeps its existing signature but omits `auth_time` for all calls in this release. Custom claim resolvers cannot override protocol claims.
+
 ### Route Middleware
 
 Customize middleware per endpoint group:

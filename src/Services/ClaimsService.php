@@ -20,7 +20,10 @@ class ClaimsService
             'sub' => $user->getOidcSubject(),
         ];
 
-        return array_merge($claims, $user->getOidcClaims($scopes));
+        $claims = array_merge($claims, $user->getOidcClaims($scopes));
+        unset($claims['auth_time']);
+
+        return $claims;
     }
 
     /**
@@ -30,7 +33,7 @@ class ClaimsService
      */
     public function getSupportedClaims(): array
     {
-        $claims = ['sub', 'iss', 'aud', 'exp', 'iat', 'auth_time'];
+        $claims = ['sub', 'iss', 'aud', 'exp', 'iat', 'nonce'];
 
         foreach (config('oidc-server.scopes') as $scope) {
             if (isset($scope['claims'])) {
@@ -38,6 +41,6 @@ class ClaimsService
             }
         }
 
-        return array_values(array_unique($claims));
+        return array_values(array_diff(array_unique($claims), ['auth_time']));
     }
 }

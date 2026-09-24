@@ -1,6 +1,9 @@
 <?php
 
+declare(strict_types=1);
+
 use Admin9\OidcServer\Http\Controllers\OidcController;
+use Admin9\OidcServer\Http\Middleware\EnforceAuthorizationPolicy;
 use Illuminate\Support\Facades\Route;
 use Laravel\Passport\Http\Controllers\AccessTokenController;
 
@@ -27,7 +30,8 @@ Route::middleware($userinfoMiddleware)->group(function () {
 
 // Token, Introspect, Revoke (machine-to-machine)
 Route::middleware($tokenMiddleware)->group(function () {
-    Route::post('oauth/token', [AccessTokenController::class, 'issueToken'])->name('passport.token');
+    Route::post('oauth/token', [AccessTokenController::class, 'issueToken'])
+        ->middleware(EnforceAuthorizationPolicy::class)->name('passport.token');
     Route::post('oauth/introspect', [OidcController::class, 'introspect'])->name('oidc.introspect');
     Route::post('oauth/revoke', [OidcController::class, 'revoke'])->name('oidc.revoke');
 });

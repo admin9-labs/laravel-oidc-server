@@ -32,11 +32,11 @@ The OpenID Connect Issuer Identifier. This value appears in the `iss` claim of I
 |-----|------|---------|
 | `user_model` | `string\|null` | `null` |
 
-The fully-qualified Eloquent model class used to look up users when generating ID tokens. When `null`, the package uses the provider model of `passport.guard` (or `auth.defaults.guard` when `passport.guard` is null). For custom providers without an Eloquent model configuration, set this explicitly.
+The fully-qualified Eloquent model class used to look up users when generating ID tokens. When `null`, the package uses the provider model of `passport.guard` (or `auth.defaults.guard` when `passport.guard` is null). For custom providers without an Eloquent model configuration, set this to the same Eloquent model class returned by that provider.
 
 ### Alternate user models and guards
 
-`passport.guard` is the single session guard setting for interactive authorization and `/oauth/logout`. It must name a stateful session guard. `user_model` only controls ID Token lookup; it does not change the browser login or the bearer-token provider used by UserInfo.
+`passport.guard` is the single session guard setting for interactive authorization and `/oauth/logout`. It must name a stateful session guard. `user_model` controls user lookup for OIDC context validation and ID Token generation; it does not change the browser login or the bearer-token provider used by UserInfo.
 
 For a Member identity separate from administrator User records, configure all three consistently:
 
@@ -68,11 +68,11 @@ For a Member identity separate from administrator User records, configure all th
 
 Member must implement `OidcUserInterface`, use `HasOidcClaims` (or provide its own claims), and satisfy the installed Passport version's user-model requirements, including `HasApiTokens` and, for Passport 13, `OAuthenticatable`. Your member login must authenticate `member_web`; configure the application's unauthenticated redirect to the member login page for that guard. If an OAuth client has a non-null `provider`, it must be `members`. Existing clients, access tokens, and refresh tokens issued for another identity provider must not be reused after switching providers.
 
-An explicit `user_model` override must resolve the same identities as the authorization and UserInfo providers. The package retains support for model overrides and custom providers; it cannot infer whether different model classes represent the same principals. Unrelated tables can have matching numeric IDs, so changing only `user_model` is unsafe.
+An explicit `user_model` must use the same model class as the provider of `passport.guard` (or `auth.defaults.guard` when `passport.guard` is null). The authenticated user and the configured model lookup must return the same runtime PHP class. Different classes are not supported even when they share a table, user ID and OIDC subject. The UserInfo provider must also resolve the same users; unrelated tables can have matching numeric IDs, so changing only `user_model` is unsafe.
 
 By default, Passport handles GET authorization authentication (including `prompt=none`), and POST/DELETE authorization always require the selected guard. Optional `routes.authorization_middleware`, such as `['auth:member_web']`, applies to all three methods without protecting Discovery/JWKS. An authentication middleware on GET runs before Passport and therefore replaces its unauthenticated `prompt=none` handling.
 
-`/oauth/logout` logs out only the selected guard, clears pending Passport authorization state and that guard's `auth.session` password hash, and rotates the session ID and CSRF token while preserving other session data. Laravel's shared password-confirmation timestamp is also cleared, so a subsequent user must confirm their own password; other logged-in guards may need to reconfirm for sensitive actions. This replaces the previous whole-session invalidation behavior; applications that need to clear additional data should use an `OidcLogoutInitiated` listener. This isolation applies to this package's logout endpoint: Passport's upstream `prompt=login` flow can still invalidate the shared session.
+`/oauth/logout` logs out only the selected guard, clears pending Passport authorization state and that guard's `auth.session` password hash, and rotates the session ID and CSRF token while preserving other session data. Laravel's shared password-confirmation timestamp is also cleared, so a subsequent user must confirm their own password; other logged-in guards may need to reconfirm for sensitive actions. This replaces the previous whole-session invalidation behavior; applications that need to clear additional data should use an `OidcLogoutInitiated` listener. This isolation applies only to the package logout endpoint. Passport handles prompt=login natively and may invalidate the shared session, including other guards. max_age and Essential auth_time requests are rejected; see [the upgrade guide](upgrading-to-1.2.2.md#nonce-and-authentication-freshness).
 
 ---
 
@@ -112,7 +112,7 @@ The Blade view rendered for the OAuth authorization prompt. You can publish the 
 |-----|------|---------|
 | `client_model` | `string` | `\Admin9\OidcServer\Models\OidcClient::class` |
 
-The Passport Client model class. The default `OidcClient` model skips the authorization prompt for first-party clients. Replace with your own model if you need different behavior.
+The default client model requires explicit consent. Existing tokens do not bypass the package authorization prompt. Custom `skipsAuthorization()` overrides are deliberate trusted-client policy; see [the upgrade guide](upgrading-to-1.2.2.md).
 
 ---
 
@@ -201,9 +201,9 @@ All values are in **seconds**.
 
 | Key | Type | Default |
 |-----|------|---------|
-| `response_types_supported` | `array` | `['code', 'token']` |
+| `response_types_supported` | `array` | `['code']` |
 
-OAuth 2.0 response types advertised in the discovery document.
+The package endpoints enforce `code`; Discovery reports `['code']` even if an older published configuration contains `token`.
 
 ---
 
@@ -218,7 +218,6 @@ Grant types advertised in the discovery document. Defaults:
 - `authorization_code`
 - `refresh_token`
 - `client_credentials`
-- `urn:ietf:params:oauth:grant-type:device_code`
 
 ---
 
@@ -256,9 +255,9 @@ Subject identifier types supported, advertised in the discovery document.
 
 | Key | Type | Default |
 |-----|------|---------|
-| `code_challenge_methods_supported` | `array` | `['S256', 'plain']` |
+| `code_challenge_methods_supported` | `array` | `['S256']` |
 
-PKCE code challenge methods supported, advertised in the discovery document.
+The package enforces and advertises only `S256`. The old metadata array cannot enable `plain`.
 
 ---
 
@@ -268,7 +267,9 @@ PKCE code challenge methods supported, advertised in the discovery document.
 |-----|------|---------|
 | `post_logout_redirect_uris_supported` | `array` | `[]` |
 
-Allowed redirect URIs after logout. Empty by default; add URIs as needed.
+Exact URI allowlist for local confirmed logout without a client. Use `post_logout_redirect_uris` (client ID => URI array) for per-client registration; otherwise the client's OAuth redirect URIs apply exactly. These lists are not combined. Arbitrary same-origin redirects are rejected.
+
+`introspection_allowed_clients` maps a confidential querying client ID to additional token-owning client IDs (strings). Default: `[]`, permitting only the caller's own tokens. This never permits cross-client revocation.
 
 ---
 

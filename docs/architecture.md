@@ -1,6 +1,6 @@
 # Architecture
 
-This document explains how `laravel-oidc-server` extends Laravel Passport into a full OIDC Identity Provider.
+This document explains how `laravel-oidc-server` adds a limited set of OIDC capabilities to Laravel Passport; authentication freshness remains deferred.
 
 ## Overview
 
@@ -90,8 +90,8 @@ JWT configuration is lazy-loaded (initialized on first use, not at boot time).
 | `sub` | `$user->getOidcSubject()` | Subject identifier |
 | `iat` | Current time | Issued at |
 | `exp` | Access token expiry | Expiration |
-| `auth_time` | Current timestamp | Authentication time |
-| `nonce` | Request parameter | Replay protection |
+| `auth_time` | Omitted in this release | Never substituted with issuance time |
+| `nonce` | Original authorization-code context | Exact request value; omitted on refresh |
 
 Additional claims are added based on requested scopes (see [Claims Resolution](claims-resolution.md) for details).
 
@@ -102,12 +102,12 @@ class OidcClient extends BaseClient
 {
     public function skipsAuthorization(Authenticatable $user, array $scopes): bool
     {
-        return $this->firstParty();
+        return false;
     }
 }
 ```
 
-First-party clients (`first_party = true`) skip the authorization prompt. Third-party clients show the consent screen. Override via `config('oidc-server.client_model')`.
+Default clients require consent, and existing tokens do not prove historical explicit approval. Custom client-model overrides are explicit operator trust decisions. See [the upgrade guide](upgrading-to-1.2.2.md).
 
 ## Data Flow
 

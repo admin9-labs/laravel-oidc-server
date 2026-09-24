@@ -93,6 +93,26 @@ class AuthorizationGuardTest extends TestCase
         $this->assertMemberAuthorizationFlow();
     }
 
+    public function test_id_token_and_userinfo_omit_auth_time_from_custom_claims(): void
+    {
+        config([
+            'oidc-server.scopes.profile.claims' => ['name', 'auth_time'],
+            'oidc-server.claims_resolver.auth_time' => fn () => now()->getTimestamp(),
+        ]);
+        $this->loginBoth();
+
+        $tokens = $this->assertMemberAuthorizationFlow();
+        $idToken = (new Parser(new JoseEncoder))->parse($tokens['id_token']);
+        $this->assertFalse($idToken->claims()->has('auth_time'));
+
+        Auth::forgetGuards();
+        $this->withToken($tokens['access_token'])->getJson('/oauth/userinfo')
+            ->assertOk()
+            ->assertJsonPath('sub', 'member:1')
+            ->assertJsonPath('name', 'Member')
+            ->assertJsonMissingPath('auth_time');
+    }
+
     public function test_consent_does_not_switch_to_a_different_administrator_id(): void
     {
         $this->loginBoth();
@@ -101,11 +121,11 @@ class AuthorizationGuardTest extends TestCase
         $this->assertMemberAuthorizationFlow();
     }
 
-    protected function assertMemberAuthorizationFlow(): void
+    protected function assertMemberAuthorizationFlow(array $parameters = []): array
     {
         $client = $this->createClient();
 
-        $authorization = $this->get($this->authorizationUrl($client, ['prompt' => 'consent']));
+        $authorization = $this->get($this->authorizationUrl($client, ['prompt' => 'consent'] + $parameters));
         $authorization->assertOk();
         $authorization->assertViewHas('user', fn ($user) => $user instanceof GuardTestMember);
 
@@ -130,6 +150,24 @@ class AuthorizationGuardTest extends TestCase
         Auth::forgetGuards();
         $this->withToken($response->json('access_token'))->getJson('/oauth/userinfo')
             ->assertOk()->assertJsonPath('sub', 'member:1')->assertJsonPath('name', 'Member');
+
+        return $response->json();
+    }
+
+    public function test_introspection_email_and_logout_hint_use_member_provider_with_colliding_admin_id(): void
+    {
+        $this->loginBoth();
+        $tokens = $this->assertMemberAuthorizationFlow(['scope' => 'openid profile email']);
+        $client = \Laravel\Passport\Passport::client()->first();
+        $client->forceFill(['secret' => 'test-secret'])->save();
+        $this->flushHeaders();
+        $this->postJson('/oauth/introspect', [
+            'client_id' => $client->id, 'client_secret' => 'test-secret', 'token' => $tokens['access_token'],
+        ])->assertJsonPath('active', true)->assertJsonPath('username', 'member@example.com');
+        $this->get('/oauth/logout?'.http_build_query(['id_token_hint' => $tokens['id_token']]))->assertRedirect('/');
+        Auth::forgetGuards();
+        $this->assertGuest('member_web');
+        $this->assertAuthenticatedAs(GuardTestAdmin::findOrFail(1), 'web');
     }
 
     public function test_null_user_model_uses_passport_guard_provider(): void
@@ -155,10 +193,8 @@ class AuthorizationGuardTest extends TestCase
         $response = $this->get($this->authorizationUrl($this->createClient(), ['prompt' => 'none']));
         $response->assertRedirect();
         parse_str(parse_url($response->headers->get('Location'), PHP_URL_QUERY), $query);
-        $expectedError = method_exists(\Laravel\Passport\Exceptions\OAuthServerException::class, 'loginRequired')
-            ? 'login_required'
-            : 'access_denied';
-        $this->assertSame($expectedError, $query['error']);
+        $this->assertSame(property_exists(\Laravel\Passport\Passport::class, 'hashesClientSecrets')
+            ? 'access_denied' : 'login_required', $query['error']);
     }
 
     public function test_approve_and_deny_require_member_even_with_pending_authorization(): void
@@ -187,7 +223,7 @@ class AuthorizationGuardTest extends TestCase
             'authRequest' => 'pending-request',
             'promptedForLogin' => true,
             'admin_preferences' => 'preserved',
-        ])->get('/oauth/logout');
+        ])->confirmOidcLogout('/oauth/logout');
 
         $response->assertRedirect('/');
         foreach ([$memberGuard->getName(), 'authToken', 'authRequest', 'promptedForLogin'] as $key) {
@@ -209,7 +245,7 @@ class AuthorizationGuardTest extends TestCase
         Event::fake([OidcLogoutInitiated::class]);
         Auth::guard('web')->login(GuardTestAdmin::findOrFail(1));
 
-        $this->get('/oauth/logout')->assertRedirect('/');
+        $this->confirmOidcLogout('/oauth/logout')->assertRedirect('/');
         Event::assertDispatched(OidcLogoutInitiated::class, fn ($event) => $event->userId === null);
         Auth::forgetGuards();
         $this->assertAuthenticatedAs(GuardTestAdmin::findOrFail(1), 'web');
@@ -225,7 +261,7 @@ class AuthorizationGuardTest extends TestCase
         $this->getJson('/member-session')->assertOk();
         $adminPasswordHash = session('password_hash_web');
 
-        $this->get('/oauth/logout')->assertRedirect('/')->assertSessionHas('password_hash_web', $adminPasswordHash);
+        $this->confirmOidcLogout('/oauth/logout')->assertRedirect('/')->assertSessionHas('password_hash_web', $adminPasswordHash);
         $nextMember = GuardTestMember::forceCreate([
             'name' => 'Next Member', 'email' => 'next@example.com', 'password' => 'different-password-hash',
         ]);
@@ -243,7 +279,7 @@ class AuthorizationGuardTest extends TestCase
         session()->passwordConfirmed();
         $this->getJson('/member-sensitive')->assertOk();
 
-        $this->get('/oauth/logout')->assertRedirect('/');
+        $this->confirmOidcLogout('/oauth/logout')->assertRedirect('/');
         $nextMember = GuardTestMember::forceCreate([
             'name' => 'Next Member', 'email' => 'next@example.com', 'password' => 'different-password-hash',
         ]);
@@ -261,7 +297,7 @@ class AuthorizationGuardTest extends TestCase
 
         // Testbench reuses the app after auth:api changes the default guard for UserInfo.
         Auth::shouldUse('member_web');
-        $this->get('/oauth/logout')->assertRedirect('/');
+        $this->confirmOidcLogout('/oauth/logout')->assertRedirect('/');
         Auth::forgetGuards();
         $this->assertGuest('member_web');
         $this->assertAuthenticatedAs(GuardTestAdmin::findOrFail(1), 'web');
@@ -272,10 +308,26 @@ class AuthorizationGuardTest extends TestCase
         config(['passport.guard' => 'web']);
         $this->loginBoth();
 
-        $this->get('/oauth/logout')->assertRedirect('/');
+        $this->confirmOidcLogout('/oauth/logout')->assertRedirect('/');
         Auth::forgetGuards();
         $this->assertGuest('web');
         $this->assertAuthenticatedAs(GuardTestMember::findOrFail(1), 'member_web');
+    }
+
+    public function test_member_freshness_request_is_rejected_without_clearing_either_guard(): void
+    {
+        Auth::guard('member_web')->login(GuardTestMember::findOrFail(1));
+        Auth::guard('web')->login(GuardTestAdmin::findOrFail(1));
+        $client = $this->createClient();
+        $response = $this->get($this->authorizationUrl($client, ['max_age' => 60, 'prompt' => 'none']))->assertRedirect();
+        $this->assertStringContainsString('invalid_request', $response->headers->get('Location'));
+        $this->assertAuthenticated('member_web');
+        $this->assertAuthenticatedAs(GuardTestAdmin::findOrFail(1), 'web');
+        $tokens = $this->assertMemberAuthorizationFlow(['nonce' => 'member-nonce']);
+        $claims = (new Parser(new JoseEncoder))->parse($tokens['id_token'])->claims();
+        $this->assertSame('member-nonce', $claims->get('nonce'));
+        $this->assertFalse($claims->has('auth_time'));
+        $this->assertAuthenticatedAs(GuardTestAdmin::findOrFail(1), 'web');
     }
 }
 

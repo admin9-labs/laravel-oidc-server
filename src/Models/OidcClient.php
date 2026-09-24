@@ -12,12 +12,12 @@ class OidcClient extends BaseClient
     /**
      * Determine if the client should skip the authorization prompt.
      *
-     * First-party clients skip the authorization confirmation.
+     * Client ownership is not proof that the user has consented.
      *
      * @param  \Laravel\Passport\Scope[]  $scopes
      */
     public function skipsAuthorization(Authenticatable $user, array $scopes): bool
     {
-        return $this->firstParty();
+        return false;
     }
 }

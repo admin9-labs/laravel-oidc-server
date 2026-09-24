@@ -72,6 +72,8 @@ php artisan vendor:publish --tag=oidc-server-views
 'ignore_passport_routes' => false,
 ```
 
+手动配置 OIDC 签发时，必须安装包的 Bridge\AuthCodeGrant、TokenResponseType 并保留授权策略中间件，参见[上下文与升级约束](upgrading-to-1.2.2.md#nonce-与认证新鲜度)。覆盖 resolveNonce() 时不能恢复从 token 请求体读取 nonce；generateToken() 保持原方法签名，但本版所有调用均省略 auth_time。自定义 claims 不能覆盖协议声明。
+
 ### 路由中间件
 
 为每个端点组自定义中间件：

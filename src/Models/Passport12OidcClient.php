@@ -10,6 +10,6 @@ class Passport12OidcClient extends Client
 {
     public function skipsAuthorization(): bool
     {
-        return $this->firstParty();
+        return false;
     }
 }

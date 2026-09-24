@@ -32,11 +32,11 @@ OpenID Connect 发行者标识符。此值会出现在 ID 令牌的 `iss` 声明
 |-----|------|---------|
 | `user_model` | `string\|null` | `null` |
 
-用于在生成 ID 令牌时查找用户的完全限定 Eloquent 模型类。当为 `null` 时，使用 `passport.guard` 对应 provider 的模型；若 `passport.guard` 为 null，则使用 `auth.defaults.guard`。自定义 provider 没有 Eloquent 模型配置时，需要显式设置此项。
+用于在生成 ID 令牌时查找用户的完全限定 Eloquent 模型类。当为 `null` 时，使用 `passport.guard` 对应 provider 的模型；若 `passport.guard` 为 null，则使用 `auth.defaults.guard`。自定义 provider 没有 Eloquent 模型配置时，需要显式设置为该 provider 返回的同一 Eloquent 模型类。
 
 ### 替代用户模型与 guard
 
-`passport.guard` 是交互式授权和 `/oauth/logout` 唯一的会话 guard 配置，必须指向有状态的 session guard。`user_model` 只控制 ID 令牌查询，不会改变浏览器登录或 UserInfo 使用的 Bearer Token provider。
+`passport.guard` 是交互式授权和 `/oauth/logout` 唯一的会话 guard 配置，必须指向有状态的 session guard。`user_model` 控制 OIDC 上下文校验和 ID 令牌生成时的用户查询，不会改变浏览器登录或 UserInfo 使用的 Bearer Token provider。
 
 如果 OIDC 使用 Member，而管理员使用独立的 User，应将三处配置对齐：
 
@@ -68,11 +68,11 @@ OpenID Connect 发行者标识符。此值会出现在 ID 令牌的 `iss` 声明
 
 Member 必须实现 `OidcUserInterface`，使用 `HasOidcClaims` 或自行提供 claims，并满足已安装 Passport 版本的用户模型要求，包括 `HasApiTokens`，以及 Passport 13 的 `OAuthenticatable`。会员登录必须登录到 `member_web`；应用应为该 guard 配置未认证时跳转的会员登录页。OAuth 客户端若设置了非空 `provider`，必须为 `members`。切换 provider 后，不得复用为原身份域签发的客户端、访问令牌和刷新令牌。
 
-显式设置的 `user_model` 必须与授权及 UserInfo provider 解析到相同身份。扩展包保留模型覆盖和自定义 provider 的支持，无法自动判断不同模型类是否代表同一组用户。无关表可能存在相同的数字 ID，因此仅修改 `user_model` 是不安全的。
+显式设置的 `user_model` 必须与 `passport.guard` 对应 provider 使用同一模型类；若 `passport.guard` 为 null，则以 `auth.defaults.guard` 为准。已认证用户与配置模型查询结果的运行时 PHP 类必须相同，即使不同类使用同一表、用户 ID 和 OIDC subject，也不支持跨类映射。UserInfo provider 也必须解析到同一组用户；无关表可能存在相同的数字 ID，因此仅修改 `user_model` 是不安全的。
 
 默认由 Passport 处理 GET 授权认证（包括 `prompt=none`），POST/DELETE 则始终要求所选 guard 已登录。可选的 `routes.authorization_middleware`（例如 `['auth:member_web']`）应用于这三种方法，不会保护 Discovery/JWKS。GET 上的认证中间件会先于 Passport 执行，因此会替代未登录时的 `prompt=none` 处理。
 
-`/oauth/logout` 仅注销所选 guard，清除 Passport 待确认授权状态及该 guard 的 `auth.session` 密码哈希，轮换 session ID 与 CSRF token，并保留其他会话数据。Laravel 共享的密码确认时间也会清除，确保后续登录者确认自己的密码；其他已登录 guard 执行敏感操作时可能需要重新确认密码。这替代了此前清空整个会话的行为；需要清理额外数据的应用可通过 `OidcLogoutInitiated` 监听器处理。隔离保证仅适用于本扩展包的登出端点；Passport 上游的 `prompt=login` 流程仍可能使共享会话整体失效。
+`/oauth/logout` 仅注销所选 guard，清除 Passport 待确认授权状态及该 guard 的 `auth.session` 密码哈希，轮换 session ID 与 CSRF token，并保留其他会话数据。Laravel 共享的密码确认时间也会清除，确保后续登录者确认自己的密码；其他已登录 guard 执行敏感操作时可能需要重新确认密码。这替代了此前清空整个会话的行为；需要清理额外数据的应用可通过 `OidcLogoutInitiated` 监听器处理。隔离保证仅适用于本包 logout；prompt=login 交由 Passport 原生处理，可能使共享 session 和其他 guard 登录失效。max_age 与 Essential auth_time 请求明确拒绝，详见[升级说明](upgrading-to-1.2.2.md#nonce-与认证新鲜度)。
 
 ---
 
@@ -112,7 +112,7 @@ Member 必须实现 `OidcUserInterface`，使用 `HasOidcClaims` 或自行提供
 |-----|------|---------|
 | `client_model` | `string` | `\Admin9\OidcServer\Models\OidcClient::class` |
 
-Passport 客户端模型类。默认的 `OidcClient` 模型会跳过第一方客户端的授权提示。如果需要不同的行为，请替换为您自己的模型。
+默认客户端模型要求显式确认，已有令牌不能跳过包授权页。自定义 `skipsAuthorization()` 属于运维明确的信任策略，参见[升级指引](upgrading-to-1.2.2.md)。
 
 ---
 
@@ -201,9 +201,9 @@ Passport 客户端模型类。默认的 `OidcClient` 模型会跳过第一方客
 
 | Key | Type | Default |
 |-----|------|---------|
-| `response_types_supported` | `array` | `['code', 'token']` |
+| `response_types_supported` | `array` | `['code']` |
 
-在发现文档中公布的 OAuth 2.0 响应类型。
+包端点仅支持 `code`；即使旧发布配置中包含 `token`，Discovery 也固定返回 `['code']`。
 
 ---
 
@@ -218,7 +218,6 @@ Passport 客户端模型类。默认的 `OidcClient` 模型会跳过第一方客
 - `authorization_code`
 - `refresh_token`
 - `client_credentials`
-- `urn:ietf:params:oauth:grant-type:device_code`
 
 ---
 
@@ -256,9 +255,9 @@ Passport 客户端模型类。默认的 `OidcClient` 模型会跳过第一方客
 
 | Key | Type | Default |
 |-----|------|---------|
-| `code_challenge_methods_supported` | `array` | `['S256', 'plain']` |
+| `code_challenge_methods_supported` | `array` | `['S256']` |
 
-支持的 PKCE 代码挑战方法，在发现文档中公布。
+包端点仅接受并宣告 `S256`，旧 metadata 配置不能启用 `plain`。
 
 ---
 
@@ -268,7 +267,9 @@ Passport 客户端模型类。默认的 `OidcClient` 模型会跳过第一方客
 |-----|------|---------|
 | `post_logout_redirect_uris_supported` | `array` | `[]` |
 
-注销后允许的重定向 URI。默认为空；根据需要添加 URI。
+未指定客户端的本地确认退出使用此精确 URI 白名单。`post_logout_redirect_uris` 按客户端 ID 配置专用 URI 数组，否则精确使用该客户端 OAuth 回调；各列表不合并，不允许同域任意路径。
+
+`introspection_allowed_clients` 将机密查询客户端 ID 映射到额外可查询的令牌所属客户端 ID（字符串）。默认 `[]`，仅可查询自身令牌，且不授予跨客户端撤销权限。
 
 ---
 
