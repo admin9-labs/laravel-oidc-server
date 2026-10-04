@@ -8,7 +8,7 @@
 
 此分支实现 2.0 认证契约：真实 `auth_time`、`max_age` 和绑定事务的重新认证。必须完成宿主接入，详见[2.0 升级说明](upgrading-to-2.0.0.md)。
 
-[2.0 设计](authentication-freshness-2.0.md)规定验收条件。
+[2.0 设计](authentication-freshness-2.0.md)规定验收条件。本地交付证据及单列的业务宿主验收清单见[实施证据](../implementation-2.0.md)。
 
 ## 系统要求
 

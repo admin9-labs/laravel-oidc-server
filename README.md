@@ -10,7 +10,7 @@ OpenID Connect Server for Laravel Passport — adds OIDC Discovery, JWKS, UserIn
 
 This branch implements the 2.0 authentication contract: real `auth_time`, `max_age`, and transaction-bound reauthentication. Host integration is required; see the [2.0 upgrade guide](docs/upgrading-to-2.0.0.md).
 
-The [2.0 design](docs/authentication-freshness-2.0.md) defines the acceptance gates.
+The [2.0 design](docs/authentication-freshness-2.0.md) defines the acceptance gates. Local delivery evidence and the separate business-host acceptance checklist are recorded in [implementation evidence](docs/implementation-2.0.md).
 
 ## Requirements
 

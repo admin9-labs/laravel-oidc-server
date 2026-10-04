@@ -1,6 +1,6 @@
 # 架构
 
-本文档说明 2.0 的宿主认证契约、授权事务和 Passport/League 签发适配。接入要求见 [2.0 升级指引](upgrading-to-2.0.0.md)。
+本文档说明 2.0 的宿主认证契约、授权事务和 Passport/League 签发适配。接入要求见 [2.0 升级指引](upgrading-to-2.0.0.md)，验收状态见[实施证据](../implementation-2.0.md)。
 
 ## 概述
 

@@ -2,6 +2,8 @@
 
 [English](authentication-freshness-2.0.md) | [简体中文](zh-CN/authentication-freshness-2.0.md)
 
+> Historical design baseline: `48b01c5`. The 2.0 package is now implemented locally; see [implementation evidence and separate business-host acceptance](implementation-2.0.md) and the [2.0 upgrade guide](upgrading-to-2.0.0.md). The proposal below is retained for comparison.
+
 **Status: Proposed; target package release: 2.0.0.** Product requirements are fixed; the API signatures and internal adapters below still need verification. See the [v1.2.2 upgrade guide](upgrading-to-1.2.2.md) for current behavior.
 
 The single goal of 2.0.0 is to make `auth_time`, `max_age`, and reauthentication reflect a real authentication event. The package cannot infer that event from a Laravel `Login` event, a remember cookie, session creation, or `setUser()`. Hosts must implement explicit authentication notification and a reauthentication entry point. Every authorization-code transaction managed by the package requires a trustworthy authentication record; an unknown time requires authentication, or `login_required` when `prompt=none` forbids interaction.

@@ -1,0 +1,325 @@
+{
+  "date": "2026-10-03",
+  "scope": "Local 2.0 package delivery; business-host deployment acceptance is separate",
+  "runtime": {
+    "php": "8.3.0",
+    "laravel": "13.17.0",
+    "passport": "13.7.5",
+    "openid_client": "6.8.8"
+  },
+  "concurrency-results": {
+    "environment": {
+      "origins": [
+        "http://127.0.0.1:18991",
+        "http://127.0.0.1:18993"
+      ],
+      "php": "8.3.0",
+      "process_termination": "SIGKILL"
+    },
+    "challenge-completion-race": {
+      "passed": true,
+      "statuses": [
+        419,
+        419,
+        302,
+        419
+      ],
+      "database_unchanged": true
+    },
+    "approval-race": {
+      "passed": true,
+      "statuses": [
+        400,
+        400,
+        400,
+        302
+      ],
+      "codes_created": 1
+    },
+    "code-exchange-race": {
+      "passed": true,
+      "statuses": [
+        200,
+        400,
+        400,
+        400
+      ],
+      "access_tokens_created": 1,
+      "refresh_tokens_created": 1
+    },
+    "refresh-race": {
+      "passed": true,
+      "statuses": [
+        400,
+        400,
+        200,
+        400
+      ],
+      "access_tokens_created": 1,
+      "refresh_tokens_created": 1
+    },
+    "expired-session-lock-lease": {
+      "passed": true,
+      "statuses": [
+        302,
+        400
+      ],
+      "concurrent_rejection_before_first_completed": true,
+      "codes_created": 1
+    },
+    "late-save-from-pre-rotation-session": {
+      "passed": true,
+      "old_snapshot_retry": 400,
+      "new_session_issued_once": true
+    },
+    "missing-refresh-state": {
+      "passed": true,
+      "database_unchanged": true,
+      "old_refresh_not_revoked": true
+    },
+    "process-exit-after-code-consumption": {
+      "passed": true,
+      "database_unchanged": true,
+      "retry": "invalid_grant"
+    },
+    "process-exit-after-challenge-completion": {
+      "passed": true,
+      "retry_status": 419,
+      "database_unchanged": true
+    },
+    "process-exit-after-approval-consumption": {
+      "passed": true,
+      "retry_status": 400,
+      "database_unchanged": true
+    }
+  },
+  "storage-outage-results": {
+    "passed": true,
+    "statuses": [
+      500,
+      500,
+      500
+    ],
+    "database_unchanged": true,
+    "refresh_not_revoked": true
+  },
+  "rollback-results": {
+    "passed": true,
+    "baseline": "48b01c5",
+    "closed_gate_blocks_authorization_and_refresh": true,
+    "closed_gate_preserves_database": true,
+    "old_refresh_works_without_gate": true,
+    "old_version_rejects_max_age": true,
+    "gate_left_closed": true
+  },
+  "forward-recovery-results": {
+    "passed": true,
+    "old_format": "invalid_grant",
+    "old_refresh_not_revoked": true,
+    "new_authorization_restores_auth_time": true
+  },
+  "rp_observations": [
+    {
+      "kind": "error",
+      "result": "OAUTH_JWT_TIMESTAMP_CHECK_FAILED",
+      "note": "Inspection delay exceeded RP max_age=0 tolerance; not counted as a passing authorization."
+    },
+    {
+      "kind": "authorization",
+      "result": "passed",
+      "auth_time": 1791013450,
+      "iat": 1791013451.668394,
+      "nonce_present": true,
+      "requirements": {
+        "max_age": "0"
+      }
+    },
+    {
+      "kind": "refresh",
+      "result": "passed",
+      "auth_time": 1791013450,
+      "iat": 1791013486.982256,
+      "nonce_present": false
+    },
+    {
+      "kind": "error",
+      "result": "consent_required"
+    },
+    {
+      "kind": "error",
+      "result": "login_required"
+    },
+    {
+      "kind": "authorization",
+      "result": "passed",
+      "auth_time": 1791013617,
+      "iat": 1791013619.027925,
+      "nonce_present": true,
+      "requirements": {
+        "max_age": "60"
+      }
+    },
+    {
+      "kind": "legacy-refresh",
+      "result": "invalid_grant"
+    },
+    {
+      "kind": "authorization",
+      "result": "passed",
+      "auth_time": 1791013617,
+      "iat": 1791014117.561728,
+      "nonce_present": true,
+      "requirements": {}
+    }
+  ],
+  "unverified": [
+    "Target host local integration",
+    "Actual upstream SSO active-authentication and verified authentication-time contract"
+  ],
+  "sso_acceptance_date": "2026-10-04",
+  "sso-results": {
+    "upstream": "oidc-provider 9.12.2",
+    "verifier_and_rp": "openid-client 6.8.8",
+    "simulated_time": false,
+    "bootstrap": {
+      "wrong_password_status": 401,
+      "auth_time": 1791069285,
+      "password_events": 1
+    },
+    "silent_restoration": {
+      "sub": "upstream-member",
+      "auth_time": 1791069285,
+      "iat": 1791069286,
+      "challenge_issued_at": 1791069286,
+      "cryptographically_verified": true,
+      "accepted": false,
+      "status": 400,
+      "new_password_events": 0,
+      "database_unchanged": true,
+      "callback_replay_status": 400
+    },
+    "state_correlation": {
+      "wrong_state_status": 400,
+      "original_callback_after_consumption_status": 400,
+      "database_unchanged": true
+    },
+    "forced_reauthentication": {
+      "sub": "upstream-member",
+      "auth_time": 1791069287,
+      "iat": 1791069288,
+      "challenge_issued_at": 1791069287,
+      "cryptographically_verified": true,
+      "accepted": true,
+      "new_password_events": 1,
+      "rp_verified": true,
+      "codes_created": 1,
+      "token_pairs_created": 1
+    },
+    "refresh": {
+      "rp_verified": true,
+      "auth_time": 1791069287,
+      "nonce_absent": true
+    },
+    "guard_isolation": true
+  },
+  "sso_browser": {
+    "tool": "ego-browser",
+    "silent_restoration": "rejected",
+    "forced_login": "RP verified",
+    "authorization_auth_time": 1791068619,
+    "refresh_auth_time": 1791068619,
+    "refresh_nonce_absent": true
+  },
+  "runtime_source_fingerprint": {
+    "method": "SHA256 of sorted path + space + file SHA256 + newline for all files in src, routes, resources and config",
+    "sha256": "07d926e4710706c7003c0e04c962b62cbb298fe9f1a397641cae4eb7ae998c69",
+    "revision": "b803b80"
+  },
+  "final_local_phpunit": {
+    "date": "2026-10-04",
+    "tests": 175,
+    "assertions": 1413,
+    "skipped": 1,
+    "skip_reason": "Passport 12 hashed-secret-only case on Passport 13",
+    "passed": true
+  },
+  "review_fixes": {
+    "base_commit": "b803b80",
+    "date": "2026-10-04",
+    "runtime_source_sha256": "30bf0ba6aa8056fbc740a2b07575c86925a5786ac71995dc87b4d80989d9b54d",
+    "coverage": [
+      "exact state on successful approval, including spaces, empty, zero and absent values",
+      "omitted redirect on confidential and public OAuth clients",
+      "explicit redirect still required and removed callback rejected",
+      "exact state and omitted redirect through guest reauthentication and continuation"
+    ],
+    "passport12_regression": {
+      "php": "8.2.13",
+      "laravel": "12.69.3",
+      "passport": "12.4.3",
+      "league": "8.5.5",
+      "passing_cases_retained": 54,
+      "corrected_case_rerun": 1,
+      "total_assertions_across_cases": 633,
+      "note": "Corrected only the negative-request test to allow native League 8/9 HTTP 400/401 mappings; valid retry succeeds."
+    },
+    "sso_failure_exit_status_verified": true,
+    "sso-results": {
+      "upstream": "oidc-provider 9.12.2",
+      "verifier_and_rp": "openid-client 6.8.8",
+      "simulated_time": false,
+      "bootstrap": {
+        "wrong_password_status": 401,
+        "auth_time": 1791078969,
+        "password_events": 1
+      },
+      "silent_restoration": {
+        "sub": "upstream-member",
+        "auth_time": 1791078969,
+        "iat": 1791078971,
+        "challenge_issued_at": 1791078970,
+        "cryptographically_verified": true,
+        "accepted": false,
+        "status": 400,
+        "new_password_events": 0,
+        "database_unchanged": true,
+        "callback_replay_status": 400
+      },
+      "state_correlation": {
+        "wrong_state_status": 400,
+        "original_callback_after_consumption_status": 400,
+        "database_unchanged": true
+      },
+      "forced_reauthentication": {
+        "sub": "upstream-member",
+        "auth_time": 1791078975,
+        "iat": 1791078975,
+        "challenge_issued_at": 1791078974,
+        "cryptographically_verified": true,
+        "accepted": true,
+        "new_password_events": 1,
+        "rp_verified": true,
+        "codes_created": 1,
+        "token_pairs_created": 1
+      },
+      "refresh": {
+        "rp_verified": true,
+        "auth_time": 1791078975,
+        "nonce_absent": true
+      },
+      "guard_isolation": true
+    },
+    "passport13_full_suite": {
+      "php": "8.3.0",
+      "laravel": "13.17.0",
+      "passport": "13.7.5",
+      "league": "9.4.1",
+      "tests": 180,
+      "assertions": 1457,
+      "skipped": 1,
+      "failures": 0,
+      "errors": 0,
+      "skip_reason": "Passport 12 hashed-secret-only case on Passport 13"
+    }
+  }
+}

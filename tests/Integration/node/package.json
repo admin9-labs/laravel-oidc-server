@@ -1,0 +1,11 @@
+{
+  "name": "oidc-local-acceptance",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.12.0" },
+  "dependencies": {
+    "oidc-provider": "9.12.2",
+    "openid-client": "6.8.8"
+  }
+}

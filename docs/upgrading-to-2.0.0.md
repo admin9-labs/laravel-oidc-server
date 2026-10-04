@@ -2,7 +2,7 @@
 
 [English](upgrading-to-2.0.0.md) | [简体中文](zh-CN/upgrading-to-2.0.0.md)
 
-**2.0 package integration guide. No release or deployment is implied.**
+**2.0 package integration guide. Completed local delivery checks and the separate business-host acceptance checklist are recorded in [implementation evidence](implementation-2.0.md). No release or deployment is implied.**
 
 2.0 requires an explicit host authentication contract for every authorization-code transaction, including OAuth requests without `openid`. A Laravel login, remembered user, `setUser()`, session creation, or successful consent does not establish an authentication time. Existing sessions without a record must authenticate again. Old code/refresh envelopes are rejected with `invalid_grant`; there is no conversion or compatibility refresh path.
 

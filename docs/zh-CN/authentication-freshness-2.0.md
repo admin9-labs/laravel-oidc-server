@@ -2,6 +2,8 @@
 
 [English](../authentication-freshness-2.0.md) | [简体中文](authentication-freshness-2.0.md)
 
+> 历史设计基线：`48b01c5`。2.0 扩展包现已完成本地实现；见[实施证据与单列的业务宿主验收](../implementation-2.0.md)及 [2.0 升级指引](upgrading-to-2.0.0.md)。下文保留原提案以便核对。
+
 **状态：拟议中；目标包版本：2.0.0。** 产品要求已确定，下文 API 签名和内部适配方式仍需验证。当前版本行为见 [v1.2.2 升级指引](upgrading-to-1.2.2.md)。
 
 2.0.0 只有一个核心目标：让 `auth_time`、`max_age` 和重新认证反映真实认证事件。包不能从 Laravel `Login` 事件、remember cookie、session 创建时间或 `setUser()` 推断该事件。宿主必须接入显式认证通知与重新认证入口。本包管理的每次授权码事务都要求可信认证记录；认证时间未知时重新认证，`prompt=none` 时返回 `login_required`。

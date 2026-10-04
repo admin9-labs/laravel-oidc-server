@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes the 2.0 host authentication contract, authorization transactions and Passport/League issuance adapters. See the [integration guide](upgrading-to-2.0.0.md).
+This document describes the 2.0 host authentication contract, authorization transactions and Passport/League issuance adapters. See the [integration guide](upgrading-to-2.0.0.md) and [acceptance evidence](implementation-2.0.md).
 
 ## Overview
 
