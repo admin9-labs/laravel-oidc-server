@@ -9,6 +9,12 @@ use Orchestra\Testbench\TestCase as BaseTestCase;
 
 class TestCase extends BaseTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->app->instance(\Admin9\OidcServer\Contracts\AtomicStateStore::class, new \Admin9\OidcServer\Tests\Support\InMemoryAtomicStateStore);
+    }
+
     protected function confirmOidcLogout(string $uri = '/oauth/logout'): \Illuminate\Testing\TestResponse
     {
         $this->get($uri)->assertOk();

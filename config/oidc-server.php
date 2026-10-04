@@ -58,6 +58,12 @@ return [
     */
     'authorization_view' => 'oidc-server::authorize',
 
+    // Shared atomic state must remain available for all nodes and token lifetimes.
+    // Missing state fails closed. See the 2.0 host integration guide.
+    'freshness' => [
+        'redis_connection' => env('OIDC_FRESHNESS_REDIS_CONNECTION', 'default'),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Client Model

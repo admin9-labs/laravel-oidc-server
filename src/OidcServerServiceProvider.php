@@ -33,6 +33,7 @@ class OidcServerServiceProvider extends PackageServiceProvider
 
     public function packageRegistered(): void
     {
+        $this->app->bind(\Admin9\OidcServer\Contracts\AtomicStateStore::class, \Admin9\OidcServer\Services\RedisAtomicStateStore::class);
         // Registration must precede Passport's boot(), including a custom route prefix.
         if (config('oidc-server.ignore_passport_routes', true)) {
             Passport::ignoreRoutes();

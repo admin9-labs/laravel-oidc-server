@@ -79,8 +79,13 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
-          extensions: mbstring, openssl, pdo, sqlite, pdo_sqlite
+          extensions: mbstring, openssl, pdo, sqlite, pdo_sqlite, redis
           coverage: none
+
+      - name: Install Redis for independent-process acceptance tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes redis-server
 
       - name: Allow Laravel 11 compatibility solve
         if: ${{ matrix.allow_insecure_framework_solve }}
