@@ -42,7 +42,8 @@ class IdTokenService
         AccessTokenEntityInterface $accessToken,
         OidcUserInterface $user,
         ClientEntityInterface $client,
-        ?string $nonce = null
+        ?string $nonce = null,
+        ?int $authTime = null,
     ): string {
         $issuer = config('oidc-server.issuer', config('app.url'));
         $now = new \DateTimeImmutable;
@@ -57,6 +58,9 @@ class IdTokenService
 
         if ($nonce !== null) {
             $builder = $builder->withClaim('nonce', $nonce);
+        }
+        if ($authTime !== null) {
+            $builder = $builder->withClaim('auth_time', $authTime);
         }
 
         // Add claims based on scopes

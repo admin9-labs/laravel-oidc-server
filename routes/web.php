@@ -6,8 +6,6 @@ use Admin9\OidcServer\Http\Controllers\OidcController;
 use Admin9\OidcServer\Http\Controllers\AuthorizationController;
 use Admin9\OidcServer\Http\Middleware\EnforceAuthorizationPolicy;
 use Illuminate\Support\Facades\Route;
-use Laravel\Passport\Http\Controllers\ApproveAuthorizationController;
-use Laravel\Passport\Http\Controllers\DenyAuthorizationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -16,17 +14,14 @@ use Laravel\Passport\Http\Controllers\DenyAuthorizationController;
 */
 
 $authorizationMiddleware = config('oidc-server.routes.authorization_middleware', []);
-$guard = config('passport.guard');
+$authorizationMiddleware = array_values(array_filter($authorizationMiddleware, fn ($middleware): bool =>
+    $middleware !== 'auth' && ! str_starts_with($middleware, 'auth:') && $middleware !== \Illuminate\Auth\Middleware\Authenticate::class));
 
-// Passport Authorization (user-facing, requires session)
-Route::middleware($authorizationMiddleware)->group(function () use ($guard) {
-    Route::get('oauth/authorize', [AuthorizationController::class, 'authorize'])
-        ->middleware(EnforceAuthorizationPolicy::class)->name('passport.authorizations.authorize');
-
-    Route::middleware([$guard ? 'auth:'.$guard : 'auth', EnforceAuthorizationPolicy::class])->group(function () {
-        Route::post('oauth/authorize', [ApproveAuthorizationController::class, 'approve'])->name('passport.authorizations.approve');
-        Route::delete('oauth/authorize', [DenyAuthorizationController::class, 'deny'])->name('passport.authorizations.deny');
-    });
+Route::middleware(array_merge($authorizationMiddleware, [EnforceAuthorizationPolicy::class]))->group(function () {
+    Route::get('oauth/authorize', [AuthorizationController::class, 'authorize'])->block()->name('passport.authorizations.authorize');
+    Route::post('oauth/authorize', [AuthorizationController::class, 'approve'])->block()->name('passport.authorizations.approve');
+    Route::delete('oauth/authorize', [AuthorizationController::class, 'deny'])->block()->name('passport.authorizations.deny');
+    Route::get('oauth/authorize/continue', [AuthorizationController::class, 'resume'])->block()->name('oidc.authorizations.continue');
 });
 
 // Protocol requests may originate at an RP without an OP CSRF token.
@@ -36,5 +31,5 @@ Route::match(['GET', 'POST'], 'oauth/logout', [OidcController::class, 'logout'])
         \Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class,
         class_exists(\Illuminate\Foundation\Http\Middleware\PreventRequestForgery::class)
             ? \Illuminate\Foundation\Http\Middleware\PreventRequestForgery::class : null,
-    ]))->name('oidc.logout');
-Route::post('oauth/logout/confirm', [OidcController::class, 'confirmLogout'])->name('oidc.logout.confirm');
+    ]))->block()->name('oidc.logout');
+Route::post('oauth/logout/confirm', [OidcController::class, 'confirmLogout'])->block()->name('oidc.logout.confirm');

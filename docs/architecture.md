@@ -1,12 +1,14 @@
 # Architecture
 
-This document explains how `laravel-oidc-server` adds a limited set of OIDC capabilities to Laravel Passport; authentication freshness remains deferred.
+This document describes the 2.0 host authentication contract, authorization transactions and Passport/League issuance adapters. See the [integration guide](upgrading-to-2.0.0.md).
 
 ## Overview
 
-Laravel Passport provides OAuth2 authorization (`/oauth/authorize`, `/oauth/token`). This package adds the OpenID Connect layer on top:
+Package controllers own `/oauth/authorize` and `/oauth/token`, using a dedicated server built from Passport repositories and League grants:
 
-- Injects `id_token` into the token response when `openid` scope is requested
+- Enforces freshness through explicit host authentication records and one-time challenges
+- Stores original authorization parameters, authentication snapshots and one-time approvals
+- Generates ID Tokens with real `auth_time` for `openid` responses after validating code/refresh context
 - Registers OIDC Discovery, JWKS, UserInfo, Introspect, Revoke, and Logout endpoints
 - Auto-configures Passport (scopes, TTLs, client model, authorization view)
 
@@ -19,11 +21,16 @@ laravel-oidc-server/
 │   ├── Contracts/OidcUserInterface.php     ← User model interface
 │   ├── Concerns/HasOidcClaims.php          ← Default claims resolution trait
 │   ├── Services/
+│   │   ├── AuthorizationFlow.php           ← Authorization and freshness checkpoints
+│   │   ├── AuthorizationTransactions.php   ← Session transactions and challenge proof
+│   │   ├── SessionAuthenticationRecorder.php ← Explicit authentication events
+│   │   ├── RedisAtomicStateStore.php        ← Atomic revisions and one-time state
+│   │   ├── OidcAuthorizationServer.php     ← Protected grants and isolated response
 │   │   ├── TokenResponseType.php           ← Injects id_token into token response
 │   │   ├── IdTokenService.php              ← JWT generation (RS256)
 │   │   └── ClaimsService.php               ← Unified claims resolution
 │   ├── Http/Controllers/OidcController.php ← OIDC endpoints (6 methods)
-│   └── Models/OidcClient.php               ← First-party client auto-approval
+│   └── Models/OidcClient.php               ← Consent required by default
 ├── config/oidc-server.php                         ← Package configuration
 ├── resources/views/authorize.blade.php     ← Default authorization view
 └── routes/web.php                          ← Route registration
@@ -31,36 +38,23 @@ laravel-oidc-server/
 
 ## Service Provider Auto-Configuration
 
-`OidcServerServiceProvider` runs in `packageBooted()`:
+`OidcServerServiceProvider` registers host contracts and native-route suppression before boot, then configures services and routes during boot:
 
 1. Calls `Passport::ignoreRoutes()` (configurable via `oidc-server.ignore_passport_routes`)
 2. Sets the authorization view (`oidc-server.authorization_view`)
 3. Sets the Client model (`oidc-server.client_model`)
 4. Registers scopes from `oidc-server.scopes`
 5. Configures token TTLs from `oidc-server.tokens`
-6. Replaces the token response type with `TokenResponseType` (id_token injection)
+6. Uses a dedicated `OidcAuthorizationServer` with protected code/refresh grants and `TokenResponseType`; native host OAuth servers remain separate
 7. Registers OIDC + Passport routes
 
-Disable auto-configuration with `config('oidc-server.configure_passport', false)`.
+`configure_passport=false` disables scope/model/TTL auto-configuration; the package server retains its authentication/context checks.
 
 ## id_token Injection — TokenResponseType
 
 `TokenResponseType` extends League OAuth2 Server's `BearerTokenResponse`:
 
-```php
-protected function getExtraParams(AccessTokenEntityInterface $accessToken): array
-{
-    // Only generate id_token when 'openid' scope is present
-    if (! in_array('openid', $scopes)) {
-        return [];
-    }
-
-    $user = $userModel::find($accessToken->getUserIdentifier());
-    $idToken = $this->idTokenService->generateToken($accessToken, $user, $client, $nonce);
-
-    return ['id_token' => $idToken];
-}
-```
+The response consumes only request-local context already verified by a grant. Its refresh envelope preserves that context; ID Token generation receives the original authentication time, and receives nonce only on authorization-code exchange. Client credentials have no authentication context and produce no ID Token.
 
 Standard OAuth2 response:
 ```json
@@ -90,7 +84,7 @@ JWT configuration is lazy-loaded (initialized on first use, not at boot time).
 | `sub` | `$user->getOidcSubject()` | Subject identifier |
 | `iat` | Current time | Issued at |
 | `exp` | Access token expiry | Expiration |
-| `auth_time` | Omitted in this release | Never substituted with issuance time |
+| `auth_time` | Explicit host authentication record | Frozen at code issuance and preserved through refresh |
 | `nonce` | Original authorization-code context | Exact request value; omitted on refresh |
 
 Additional claims are added based on requested scopes (see [Claims Resolution](claims-resolution.md) for details).
@@ -107,7 +101,7 @@ class OidcClient extends BaseClient
 }
 ```
 
-Default clients require consent, and existing tokens do not prove historical explicit approval. Custom client-model overrides are explicit operator trust decisions. See [the upgrade guide](upgrading-to-1.2.2.md).
+Default clients require consent, and existing tokens do not prove historical explicit approval. Custom client-model overrides are explicit operator trust decisions. See the [2.0 integration guide](upgrading-to-2.0.0.md).
 
 ## Data Flow
 

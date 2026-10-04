@@ -5,67 +5,25 @@ declare(strict_types=1);
 namespace Admin9\OidcServer\Services;
 
 use Admin9\OidcServer\Contracts\OidcUserInterface;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use League\OAuth2\Server\AuthorizationServer;
 use League\OAuth2\Server\Entities\AccessTokenEntityInterface;
 use League\OAuth2\Server\Exception\OAuthServerException;
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\ServerRequestInterface;
-use Symfony\Component\HttpFoundation\Response;
 
 class AuthorizationContext
 {
     public const ATTRIBUTE = 'oidc.authorization_context';
 
-    public const VERSION = 2;
+    public const VERSION = 3;
 
-    public function prepare(Request $request): ?Response
-    {
-        // Let Passport validate the client and callback before returning protocol errors.
-        try {
-            $authorization = app(AuthorizationServer::class)->validateAuthorizationRequest(app(ServerRequestInterface::class));
-        } catch (OAuthServerException $exception) {
-            $response = $exception->generateHttpResponse(app(ResponseInterface::class));
+    public const TOKEN_ATTRIBUTE = 'oidc.verified_token_context';
 
-            return new Response((string) $response->getBody(), $response->getStatusCode(), $response->getHeaders());
-        }
-
-        // Preserve protocol strings before TrimStrings/ConvertEmptyStringsToNull.
-        $query = (string) $request->server->get('QUERY_STRING', '');
-        parse_str($query, $parameters);
-        if ($error = $this->parameterError($query, $parameters)) {
-            $redirect = $authorization->getRedirectUri() ?? (array) $authorization->getClient()->getRedirectUri();
-            $redirect = is_array($redirect) ? $redirect[0] : $redirect;
-
-            return redirect()->away($redirect.(str_contains($redirect, '?') ? '&' : '?').http_build_query([
-                'error' => 'invalid_request', 'error_description' => $error,
-                'state' => is_string($parameters['state'] ?? null) ? $parameters['state'] : $authorization->getState(),
-            ]))->header('Cache-Control', 'no-store');
-        }
-
-        // Passport owns guest authentication and prompt=login, including its session policy.
-        $guard = config('passport.guard') ?? Auth::getDefaultDriver();
-        $user = Auth::guard($guard)->user();
-        $request->attributes->set(self::ATTRIBUTE, [
-            'v' => self::VERSION, 'nonce' => $parameters['nonce'] ?? null,
-            'identity' => [$guard, $user ? get_class($user) : null, $user ? (string) $user->getAuthIdentifier() : null],
-            'client_id' => $authorization->getClient()->getIdentifier(),
-            'iss' => config('oidc-server.issuer', config('app.url')),
-            'sub' => $user instanceof OidcUserInterface ? $user->getOidcSubject() : null,
-        ]);
-
-        return null;
-    }
-
-    protected function parameterError(string $query, array $parameters): ?string
+    public function parameterError(string $query, array $parameters): ?string
     {
         $seen = [];
         $separator = preg_quote(ini_get('arg_separator.input') ?: '&', '/');
         foreach (preg_split('/['.$separator.']/', $query) as $pair) {
             $key = urldecode(explode('=', $pair, 2)[0]);
             parse_str($pair, $parsed);
-            foreach (['nonce', 'max_age', 'prompt', 'claims'] as $name) {
+            foreach (['client_id', 'redirect_uri', 'response_type', 'scope', 'state', 'nonce', 'max_age', 'prompt', 'claims', 'code_challenge', 'code_challenge_method'] as $name) {
                 if (! array_key_exists($name, $parsed)) {
                     continue;
                 }
@@ -77,7 +35,18 @@ class AuthorizationContext
             }
         }
         if (array_key_exists('max_age', $parameters)) {
-            return 'max_age is not supported in this release.';
+            $age = $parameters['max_age'];
+            if (! is_string($age) || ! preg_match('/\A[0-9]+\z/', $age)) {
+                return 'max_age must be a non-negative decimal integer.';
+            }
+            $normalized = ltrim($age, '0') ?: '0';
+            if (strlen($normalized) > strlen((string) PHP_INT_MAX)
+                || (strlen($normalized) === strlen((string) PHP_INT_MAX) && strcmp($normalized, (string) PHP_INT_MAX) > 0)) {
+                return 'max_age is too large.';
+            }
+        }
+        if (isset($parameters['state']) && ! is_string($parameters['state'])) {
+            return 'state must be a string.';
         }
         $nonce = $parameters['nonce'] ?? null;
         $prompt = $parameters['prompt'] ?? '';
@@ -85,6 +54,9 @@ class AuthorizationContext
             return 'Invalid nonce or prompt parameter.';
         }
         $prompts = preg_split('/ +/', trim($prompt), -1, PREG_SPLIT_NO_EMPTY);
+        if (array_diff($prompts, ['none', 'login', 'consent']) !== [] || count(array_unique($prompts)) !== count($prompts)) {
+            return 'Unsupported or repeated prompt value.';
+        }
         if (in_array('none', $prompts, true) && count($prompts) > 1) {
             return 'prompt=none cannot be combined with another prompt.';
         }
@@ -117,8 +89,9 @@ class AuthorizationContext
                     || (property_exists($options, 'essential') && ! is_bool($options->essential))) {
                     return 'Invalid claim requirements.';
                 }
-                if ($name === 'auth_time' && ($options->essential ?? false)) {
-                    return 'Essential auth_time is not supported in this release.';
+                if ($name === 'auth_time' && (array_diff(array_keys((array) $options), ['essential']) !== []
+                    || ($section === 'userinfo' && ($options->essential ?? false)))) {
+                    return 'Unsupported auth_time claim constraint. Request auth_time in id_token using essential or null.';
                 }
             }
         }
@@ -128,56 +101,99 @@ class AuthorizationContext
 
     public function forToken(AccessTokenEntityInterface $token): ?array
     {
-        $field = match (request()->input('grant_type')) {
-            'authorization_code' => 'code',
-            'refresh_token' => 'refresh_token',
-            default => null,
-        };
-        $value = $field ? request()->input($field) : null;
-        $cacheKey = 'oidc.token_context.'.hash('sha256', serialize([
-            $field, $value, $token->getIdentifier(), $token->getClient()->getIdentifier(), $token->getUserIdentifier(),
-        ]));
-        if (request()->attributes->has($cacheKey)) {
-            return request()->attributes->get($cacheKey);
-        }
-        $payload = is_string($value) ? app(TokenVerifier::class)->encryptedPayload($value) : null;
-        $context = $payload['oidc'] ?? null;
-        if (! is_array($context) || ! $this->validPayload($payload)
-            || ($payload['client_id'] ?? null) !== $token->getClient()->getIdentifier()
-            || (string) ($payload['user_id'] ?? '') !== (string) $token->getUserIdentifier()) {
+        $context = request()->attributes->get(self::TOKEN_ATTRIBUTE);
+        if (! is_array($context) || $context['client_id'] !== $token->getClient()->getIdentifier()
+            || $context['identity'][2] !== (string) $token->getUserIdentifier()) {
             return null;
         }
-        // The response needs the same identity context for its refresh envelope
-        // and nonce. Decrypt once per token in this request, never across requests.
-        request()->attributes->set($cacheKey, $context);
 
         return $context;
+    }
+
+    public function validateTokenPayload(array $payload): array
+    {
+        if (! $this->validPayload($payload)) {
+            throw OAuthServerException::invalidGrant('Invalid authentication context. Restart authorization.');
+        }
+        request()->attributes->set(self::TOKEN_ATTRIBUTE, $payload['oidc']);
+
+        return $payload['oidc'];
+    }
+
+    public function decodeEnvelope(string $json, string $kind): array
+    {
+        try {
+            $payload = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $exception) {
+            throw OAuthServerException::invalidGrant('Invalid token envelope.');
+        }
+        if (! is_array($payload) || ! is_string($payload['client_id'] ?? null)
+            || ! is_string($payload['user_id'] ?? null) || ! is_int($payload['expire_time'] ?? null)
+            || ! is_array($payload['scopes'] ?? null) || ! array_is_list($payload['scopes'])) {
+            throw OAuthServerException::invalidGrant('Invalid token envelope.');
+        }
+        foreach ($payload['scopes'] as $scope) {
+            if (! is_string($scope) || $scope === '') {
+                throw OAuthServerException::invalidGrant('Invalid token scope.');
+            }
+        }
+        foreach ($kind === 'code' ? ['auth_code_id'] : ['access_token_id', 'refresh_token_id'] as $key) {
+            if (! is_string($payload[$key] ?? null) || $payload[$key] === '') {
+                throw OAuthServerException::invalidGrant('Invalid token identifier.');
+            }
+        }
+        if ($kind === 'code' && (! array_key_exists('redirect_uri', $payload)
+            || ($payload['redirect_uri'] !== null && ! is_string($payload['redirect_uri']))
+            || (isset($payload['code_challenge']) && (! is_string($payload['code_challenge']) || ($payload['code_challenge_method'] ?? null) !== 'S256')))) {
+            throw OAuthServerException::invalidGrant('Invalid authorization code binding.');
+        }
+
+        return $payload;
     }
 
     public function validPayload(array $payload): bool
     {
         $context = $payload['oidc'] ?? null;
-        $valid = is_array($context) && ($context['v'] ?? null) === self::VERSION
-            && array_key_exists('nonce', $context) && ($context['nonce'] === null || is_string($context['nonce']))
-            && array_diff(array_keys($context), ['v', 'nonce', 'identity', 'client_id', 'iss', 'sub']) === []
-            && is_array($context['identity'] ?? null) && count($context['identity']) === 3
-            && is_string($context['identity'][0] ?? null) && is_string($context['identity'][1] ?? null)
-            && ($context['identity'][2] ?? null) === (string) ($payload['user_id'] ?? '')
-            && ($context['client_id'] ?? null) === ($payload['client_id'] ?? null)
-            && is_string($context['iss'] ?? null) && is_string($context['sub'] ?? null);
-        if (! $valid) {
+        if (! is_array($context) || ($context['v'] ?? null) !== self::VERSION
+            || ! $this->keys($context, ['v', 'nonce', 'identity', 'client_id', 'iss', 'sub', 'authentication'])
+            || ($context['nonce'] !== null && (! is_string($context['nonce']) || ! mb_check_encoding($context['nonce'], 'UTF-8')))
+            || ! is_array($context['identity']) || ! array_is_list($context['identity']) || count($context['identity']) !== 3
+            || ! is_string($context['client_id']) || $context['client_id'] === ''
+            || $context['client_id'] !== ($payload['client_id'] ?? null)
+            || ! is_string($context['iss']) || ! is_string($context['sub']) || $context['sub'] === '') {
+            return false;
+        }
+        foreach ($context['identity'] as $value) {
+            if (! is_string($value) || $value === '') {
+                return false;
+            }
+        }
+        $authentication = $context['authentication'];
+        if (! is_array($authentication) || ! $this->keys($authentication, ['auth_time', 'generation'])
+            || ! is_int($authentication['auth_time']) || $authentication['auth_time'] < 0 || $authentication['auth_time'] > now()->timestamp
+            || ! is_string($authentication['generation']) || ! preg_match('/\A[a-f0-9]{64}\z/', $authentication['generation'])
+            || (! is_string($payload['user_id'] ?? null) && ! is_int($payload['user_id'] ?? null))
+            || $context['identity'][2] !== (string) $payload['user_id']) {
             return false;
         }
         $guard = config('passport.guard') ?? config('auth.defaults.guard');
         $provider = config('auth.guards.'.$guard.'.provider');
-        $model = config('oidc-server.user_model') ?? config('auth.providers.'.$provider.'.model');
-        if ($context['identity'][0] !== $guard
-            || $context['iss'] !== config('oidc-server.issuer', config('app.url'))) {
+        $providerModel = config('auth.providers.'.$provider.'.model');
+        $model = config('oidc-server.user_model') ?? $providerModel;
+        if (! is_string($model) || ! class_exists($model) || ! is_string($providerModel) || ! class_exists($providerModel)
+            || (new \ReflectionClass($model))->getName() !== (new \ReflectionClass($providerModel))->getName()
+            || $context['identity'][0] !== $guard || $context['iss'] !== config('oidc-server.issuer', config('app.url'))) {
             return false;
         }
         $user = $model::find($context['identity'][2]);
 
         return $user instanceof OidcUserInterface && $context['identity'][1] === get_class($user)
+            && $context['identity'][2] === (string) $user->getAuthIdentifier()
             && $context['sub'] === $user->getOidcSubject();
+    }
+
+    private function keys(array $value, array $keys): bool
+    {
+        return count($value) === count($keys) && array_diff($keys, array_keys($value)) === [];
     }
 }

@@ -111,7 +111,8 @@ class TokenVerifier
 
         // An expired access token can still have a usable refresh token.
         if ($activeOnly && ($refresh->revoked || ! $refresh->expires_at?->isFuture()
-            || $payload['expire_time'] <= time())) {
+            || $payload['expire_time'] <= time()
+            || ! app(TokenConsumption::class)->isAvailable('refresh', $payload))) {
             return null;
         }
 

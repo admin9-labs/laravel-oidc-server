@@ -114,9 +114,9 @@ abstract class PassportTestCase extends TestCase
 
     protected function issueTokens(Client $client, ?OidcUser $user = null): array
     {
-        Auth::guard('web')->login($user ?? $this->user());
-        $this->authorize($client)->assertOk();
-        $response = $this->post('/oauth/authorize', ['auth_token' => session('authToken')]);
+        $this->authenticateUser($user);
+        $view = $this->authorize($client)->assertOk();
+        $response = $this->post('/oauth/authorize', $this->consentForm($view));
         $response->assertRedirect();
         parse_str(parse_url($response->headers->get('Location'), PHP_URL_QUERY), $query);
         $response = $this->postJson('/oauth/token', array_merge([
@@ -127,6 +127,21 @@ abstract class PassportTestCase extends TestCase
         $response->assertOk()->assertJsonStructure(['access_token', 'refresh_token', 'id_token']);
 
         return $response->json();
+    }
+
+    protected function authenticateUser(?OidcUser $user = null): OidcUser
+    {
+        $user ??= $this->user();
+        Auth::guard('web')->login($user);
+        request()->setLaravelSession(app('session.store'));
+        app(\Admin9\OidcServer\Contracts\AuthenticationRecorder::class)->markAuthenticated('web', $user);
+
+        return $user;
+    }
+
+    protected function consentForm(\Illuminate\Testing\TestResponse $response): array
+    {
+        return ['transaction' => $response->viewData('transactionId'), 'auth_token' => $response->viewData('authToken')];
     }
 
     protected function confirmLogout(array $parameters = []): \Illuminate\Testing\TestResponse

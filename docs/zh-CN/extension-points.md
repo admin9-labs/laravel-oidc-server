@@ -49,7 +49,7 @@ php artisan vendor:publish --tag=oidc-server-views
 'authorization_view' => 'auth.oauth.authorize',
 ```
 
-该视图接收 `$client`、`$scopes`、`$request` 和 `$authToken` 变量。
+视图接收 `$client`、`$user`、`$scopes`、`$transactionId` 和 `$authToken`。表单提交 `transaction`、`auth_token` 与 CSRF，拒绝使用 DELETE。
 
 ### 自定义客户端模型
 
@@ -72,7 +72,7 @@ php artisan vendor:publish --tag=oidc-server-views
 'ignore_passport_routes' => false,
 ```
 
-手动配置 OIDC 签发时，必须安装包的 Bridge\AuthCodeGrant、TokenResponseType 并保留授权策略中间件，参见[上下文与升级约束](upgrading-to-1.2.2.md#nonce-与认证新鲜度)。覆盖 resolveNonce() 时不能恢复从 token 请求体读取 nonce；generateToken() 保持原方法签名，但本版所有调用均省略 auth_time。自定义 claims 不能覆盖协议声明。
+手工路由使用本包控制器、`OidcAuthorizationServer` 和策略中间件；浏览器路由还需 `web` 与 `block()`。server 独立安装受保护的 grants/response，不受自动配置开关影响，也不要全局安装。参见 [2.0 宿主契约](upgrading-to-2.0.0.md)。`generateToken()` 第五个参数接收可信认证时间，token response 只使用 grant 验证后的上下文，自定义 claims 不能覆盖协议声明。
 
 ### 路由中间件
 

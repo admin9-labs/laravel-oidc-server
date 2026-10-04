@@ -53,7 +53,7 @@ class OidcController extends Controller
             'token_endpoint_auth_methods_supported' => config('oidc-server.token_endpoint_auth_methods_supported'),
             'claims_supported' => $this->claimsService->getSupportedClaims(),
             'code_challenge_methods_supported' => ['S256'],
-            'grant_types_supported' => config('oidc-server.grant_types_supported'),
+            'grant_types_supported' => ['authorization_code', 'refresh_token', 'client_credentials'],
             'introspection_endpoint_auth_methods_supported' => config('oidc-server.token_endpoint_auth_methods_supported'),
             'revocation_endpoint_auth_methods_supported' => config('oidc-server.token_endpoint_auth_methods_supported'),
         ];

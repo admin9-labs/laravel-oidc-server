@@ -70,9 +70,9 @@ Member 必须实现 `OidcUserInterface`，使用 `HasOidcClaims` 或自行提供
 
 显式设置的 `user_model` 必须与 `passport.guard` 对应 provider 使用同一模型类；若 `passport.guard` 为 null，则以 `auth.defaults.guard` 为准。已认证用户与配置模型查询结果的运行时 PHP 类必须相同，即使不同类使用同一表、用户 ID 和 OIDC subject，也不支持跨类映射。UserInfo provider 也必须解析到同一组用户；无关表可能存在相同的数字 ID，因此仅修改 `user_model` 是不安全的。
 
-默认由 Passport 处理 GET 授权认证（包括 `prompt=none`），POST/DELETE 则始终要求所选 guard 已登录。可选的 `routes.authorization_middleware`（例如 `['auth:member_web']`）应用于这三种方法，不会保护 Discovery/JWKS。GET 上的认证中间件会先于 Passport 执行，因此会替代未登录时的 `prompt=none` 处理。
+本包通过宿主显式认证契约编排 GET 授权，包括 `prompt=none`。POST/DELETE 必须提供有效的事务凭据，且认证快照须与所选 guard 的当前用户匹配。注册路由时，本包会从 `routes.authorization_middleware` 中过滤 `auth`、`auth:*` 和 `Illuminate\Auth\Middleware\Authenticate` 类名，确保访客和重新认证请求可以到达本包流程。剩余中间件应用于这三种方法，不会保护 Discovery/JWKS。仍作用于 GET 的自定义认证中间件可能将本包的 `prompt=none` 错误响应替换为登录跳转。
 
-`/oauth/logout` 仅注销所选 guard，清除 Passport 待确认授权状态及该 guard 的 `auth.session` 密码哈希，轮换 session ID 与 CSRF token，并保留其他会话数据。Laravel 共享的密码确认时间也会清除，确保后续登录者确认自己的密码；其他已登录 guard 执行敏感操作时可能需要重新确认密码。这替代了此前清空整个会话的行为；需要清理额外数据的应用可通过 `OidcLogoutInitiated` 监听器处理。隔离保证仅适用于本包 logout；prompt=login 交由 Passport 原生处理，可能使共享 session 和其他 guard 登录失效。max_age 与 Essential auth_time 请求明确拒绝，详见[升级说明](upgrading-to-1.2.2.md#nonce-与认证新鲜度)。
+`/oauth/logout` 仅注销所选 guard，清除 Passport 待确认授权状态及该 guard 的 `auth.session` 密码哈希，轮换 session ID 与 CSRF token，并保留其他会话数据。Laravel 共享的密码确认时间也会清除，确保后续登录者确认自己的密码；其他已登录 guard 执行敏感操作时可能需要重新确认密码。这替代了此前清空整个会话的行为；需要清理额外数据的应用可通过 `OidcLogoutInitiated` 监听器处理。重新认证使用宿主契约并保留其他 guard。recorder、handler、共享 session/锁及 Redis 要求见 [2.0 接入指引](upgrading-to-2.0.0.md)。
 
 ---
 
@@ -82,7 +82,7 @@ Member 必须实现 `OidcUserInterface`，使用 `HasOidcClaims` 或自行提供
 |-----|------|---------|
 | `configure_passport` | `bool` | `true` |
 
-当为 `true` 时，扩展包会自动配置 Laravel Passport：注册作用域、设置令牌 TTL、设置响应类型、分配客户端模型并注册授权视图。如果您想完全手动控制 Passport 配置，请设置为 `false`。
+当为 `true` 时，扩展包会自动配置 Laravel Passport：注册作用域、设置令牌 TTL、分配客户端模型并注册授权视图。本包 server 始终使用受保护的 grants/response；设为 `false` 不会关闭认证检查。
 
 ---
 
@@ -92,7 +92,17 @@ Member 必须实现 `OidcUserInterface`，使用 `HasOidcClaims` 或自行提供
 |-----|------|---------|
 | `ignore_passport_routes` | `bool` | `true` |
 
-当为 `true` 时，扩展包会调用 `Passport::ignoreRoutes()` 来阻止 Passport 注册其默认路由。如果您需要在 OIDC 路由之外使用 Passport 的内置路由，请设置为 `false`。
+当为 `true` 时，扩展包调用 `Passport::ignoreRoutes()` 阻止 Passport 注册其默认路由。设为 `false` 时，保留的 Passport 授权/token 路由（包括自定义前缀）是本包 controller 的受保护别名，执行相同的 grant 策略，不会恢复 password、device 或自定义用户 grant。独立的宿主 OAuth 入口必须使用自己的 controller、原生 server/response 和 envelope 加密密钥，见 [2.0 接入指引](upgrading-to-2.0.0.md)。
+
+---
+
+### `freshness.redis_connection`
+
+| Key | Type | Default | Env Variable |
+|-----|------|---------|--------------|
+| `freshness.redis_connection` | `string` | `'default'` | `OIDC_FRESHNESS_REDIS_CONNECTION` |
+
+用于共享原子认证状态和一次性 code/refresh 状态的 Laravel Redis 连接。所有 web/token worker 必须访问同一个权威可写 Redis 服务端，并允许 `INFO server` 和 Lua 执行。Redis 重启或主节点切换会改变 `run_id`，使旧 freshness 状态失效。该连接不配置 Laravel session 存储或 session blocking 使用的缓存存储；它们也必须满足 [共享存储和锁要求](upgrading-to-2.0.0.md)。
 
 ---
 
@@ -144,6 +154,8 @@ Member 必须实现 `OidcUserInterface`，使用 `HasOidcClaims` 或自行提供
 | `default_scopes` | `array` | `['openid']` |
 
 当客户端未明确请求任何作用域时自动应用的作用域。
+
+Client credentials 请求也可能继承这些作用域，包括默认的 `openid`。此类令牌代表客户端，不携带用户认证上下文，也不返回 ID Token。宿主应配置或请求服务 API 所需的作用域；仅包含 `openid` 并不代表用户已认证。
 
 ---
 
@@ -213,7 +225,7 @@ Member 必须实现 `OidcUserInterface`，使用 `HasOidcClaims` 或自行提供
 |-----|------|---------|
 | `grant_types_supported` | `array` | 见下文 |
 
-在发现文档中公布的授权类型。默认值：
+保留的配置项。2.0 包端点与 Discovery 固定使用以下列表，即使旧发布配置声明了其他 grant，也不会启用或公布它们：
 
 - `authorization_code`
 - `refresh_token`
@@ -285,7 +297,7 @@ Member 必须实现 `OidcUserInterface`，使用 `HasOidcClaims` 或自行提供
 
 - `enabled` -- 设置为 `false` 可禁用扩展包注册的所有路由。
 - `discovery_middleware` -- 应用于 `/.well-known/openid-configuration` 和 JWKS 端点的中间件。
-- `authorization_middleware` -- 应用于 GET/POST/DELETE `/oauth/authorize` 的额外中间件。POST/DELETE 还必须通过 `passport.guard` 认证。
+- `authorization_middleware` -- 应用于 GET/POST/DELETE `/oauth/authorize` 的额外中间件，内置认证项会按上文说明被过滤。本包在 POST/DELETE 上校验事务凭据，并核对认证快照与 `passport.guard` 当前用户。剩余的自定义 GET 认证中间件可能替代本包的静默授权错误处理。
 - `token_middleware` -- 应用于 `/oauth/token`、`/oauth/introspect` 和 `/oauth/revoke` 端点的中间件。登出使用 `web` 中间件组提供会话支持。
 - `userinfo_middleware` -- 应用于 userinfo 端点的中间件。默认为 `auth:api`。
 
@@ -298,6 +310,7 @@ Member 必须实现 `OidcUserInterface`，使用 `HasOidcClaims` 或自行提供
 | Variable | Config Key | Type | Default | Description |
 |----------|-----------|------|---------|-------------|
 | `OIDC_ISSUER` | `issuer` | `string` | `APP_URL` | OpenID Connect 发行者标识符 |
+| `OIDC_FRESHNESS_REDIS_CONNECTION` | `freshness.redis_connection` | `string` | `default` | 共享原子 freshness 状态的 Redis 连接 |
 | `OIDC_ACCESS_TOKEN_TTL` | `tokens.access_token_ttl` | `int` | `900` | 访问令牌生命周期（秒） |
 | `OIDC_REFRESH_TOKEN_TTL` | `tokens.refresh_token_ttl` | `int` | `604800` | 刷新令牌生命周期（秒） |
 | `OIDC_ID_TOKEN_TTL` | `tokens.id_token_ttl` | `int` | `900` | 保留供将来使用 |

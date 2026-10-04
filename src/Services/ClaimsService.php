@@ -33,7 +33,7 @@ class ClaimsService
      */
     public function getSupportedClaims(): array
     {
-        $claims = ['sub', 'iss', 'aud', 'exp', 'iat', 'nonce'];
+        $claims = ['sub', 'iss', 'aud', 'exp', 'iat', 'nonce', 'auth_time'];
 
         foreach (config('oidc-server.scopes') as $scope) {
             if (isset($scope['claims'])) {
@@ -41,6 +41,6 @@ class ClaimsService
             }
         }
 
-        return array_values(array_diff(array_unique($claims), ['auth_time']));
+        return array_values(array_unique($claims));
     }
 }

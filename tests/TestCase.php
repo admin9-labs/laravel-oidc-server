@@ -48,6 +48,7 @@ class TestCase extends BaseTestCase
             'database' => ':memory:',
             'prefix' => '',
         ]);
-        $app['config']->set('session.driver', 'array');
+        $app['config']->set('session.driver', 'file');
+        $app['config']->set('session.block_store', 'file');
     }
 }

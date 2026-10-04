@@ -45,12 +45,12 @@ class DiscoveryTest extends TestCase
         $response->assertHeader('Cache-Control', 'max-age=3600, public');
     }
 
-    public function test_auth_time_is_not_advertised_even_by_published_scope_configuration(): void
+    public function test_auth_time_is_advertised_without_duplicate_claims(): void
     {
         config(['oidc-server.scopes.openid.claims' => ['sub', 'auth_time']]);
         $claims = $this->getJson('/.well-known/openid-configuration')->assertOk()->json('claims_supported');
 
-        $this->assertNotContains('auth_time', $claims);
+        $this->assertContains('auth_time', $claims);
         $this->assertContains('nonce', $claims);
     }
 

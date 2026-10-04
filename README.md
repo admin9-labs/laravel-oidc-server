@@ -8,15 +8,16 @@
 
 OpenID Connect Server for Laravel Passport — adds OIDC Discovery, JWKS, UserInfo, Token Introspection, Token Revocation, and RP-Initiated Logout to any Laravel + Passport application.
 
-This release omits auth_time and rejects max_age / Essential auth_time requests. Full OIDC authentication freshness remains deferred; see the [upgrade guide](docs/upgrading-to-1.2.2.md).
+This branch implements the 2.0 authentication contract: real `auth_time`, `max_age`, and transaction-bound reauthentication. Host integration is required; see the [2.0 upgrade guide](docs/upgrading-to-2.0.0.md).
 
-The [2.0.0 authentication freshness proposal](docs/authentication-freshness-2.0.md) describes the planned host contract, authorization flow, compatibility rules, and release gates. It is not implemented in this release.
+The [2.0 design](docs/authentication-freshness-2.0.md) defines the acceptance gates.
 
 ## Requirements
 
 - PHP 8.2+
 - Laravel 11, 12, or 13
 - Laravel Passport 12 or 13
+- Shared server-side sessions, session blocking, and shared Redis atomic state
 
 ## Quick Start
 
@@ -69,11 +70,6 @@ php artisan passport:client
 # For client credentials grant (recommended for machine-to-machine, e.g., microservices)
 php artisan passport:client --client
 
-# For password grant (only for first-party trusted apps)
-php artisan passport:client --password
-
-# Or install default clients (personal access + password grant)
-php artisan passport:install
 ```
 
 You'll receive a **Client ID** and **Client Secret** — save these for configuring your client application.
@@ -81,7 +77,7 @@ You'll receive a **Client ID** and **Client Secret** — save these for configur
 **Grant Type Guide:**
 - **Authorization Code Flow**: For web apps with user interaction, most secure
 - **Client Credentials Grant**: For server-to-server API calls, no user involvement
-- **Password Grant**: Only for first-party trusted apps, not recommended for third-party
+- Password/device/custom user grants require a separate host OAuth entry; package endpoints reject them.
 
 ### 5. (Optional) Publish and customize the config
 
@@ -93,7 +89,11 @@ Edit `config/oidc-server.php` to customize scopes, claims, token TTLs, and more.
 
 ---
 
-**That's it!** Your OIDC server is ready. Test it by visiting:
+### 6. Connect host authentication
+
+Implement `AuthenticationRecorder` calls after complete authentication and bind a `ReauthenticationHandler`, following the [2.0 integration guide](docs/upgrading-to-2.0.0.md). Configure shared sessions, locks and Redis before accepting authorizations.
+
+Discovery is available at:
 
 ```
 https://your-app.test/.well-known/openid-configuration
@@ -105,8 +105,8 @@ https://your-app.test/.well-known/openid-configuration
 |---|---|---|
 | `/.well-known/openid-configuration` | GET | OIDC Discovery |
 | `/.well-known/jwks.json` | GET | JSON Web Key Set |
-| `/oauth/authorize` | GET | Authorization (Passport) |
-| `/oauth/token` | POST | Token (Passport) |
+| `/oauth/authorize` | GET | Authorization and authentication freshness |
+| `/oauth/token` | POST | Protected code/refresh and client credentials |
 | `/oauth/userinfo` | GET/POST | UserInfo |
 | `/oauth/introspect` | POST | Token Introspection (RFC 7662) |
 | `/oauth/revoke` | POST | Token Revocation (RFC 7009) |
@@ -173,4 +173,4 @@ See the [Configuration Reference](docs/configuration.md) for all available optio
 
 ## Security upgrade
 
-Read the [v1.2.2 upgrade guide](docs/upgrading-to-1.2.2.md) for logout confirmation, exact callbacks, resource-server authorization and historical-grant handling.
+Read the [2.0 upgrade guide](docs/upgrading-to-2.0.0.md) for logout confirmation, exact callbacks, resource-server authorization and historical-grant handling.

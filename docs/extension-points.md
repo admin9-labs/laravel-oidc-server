@@ -49,7 +49,7 @@ Or point to your own view:
 'authorization_view' => 'auth.oauth.authorize',
 ```
 
-The view receives `$client`, `$scopes`, `$request`, and `$authToken`.
+The view receives `$client`, `$user`, `$scopes`, `$transactionId`, and `$authToken`. Forms send `transaction`, `auth_token` and CSRF; deny uses DELETE.
 
 ### Custom Client Model
 
@@ -72,7 +72,7 @@ Disable auto-configuration to manage Passport yourself:
 'ignore_passport_routes' => false,
 ```
 
-For OIDC code issuance, manual configuration must install the package's `Bridge\AuthCodeGrant` and `TokenResponseType` and retain authorization-policy middleware. See the [context and upgrade contract](upgrading-to-1.2.2.md#nonce-and-authentication-freshness). Overrides of `resolveNonce()` must not restore token-body nonce handling; `generateToken()` keeps its existing signature but omits `auth_time` for all calls in this release. Custom claim resolvers cannot override protocol claims.
+Use the package controllers, `OidcAuthorizationServer` and policy middleware for manual package routes, with `web` and `block()` for browser routes. The server installs its protected grants/response independently of auto-configuration. Do not install them globally. See the [2.0 host contract](upgrading-to-2.0.0.md). `generateToken()` accepts verified authentication time as its fifth argument; token responses only consume grant-validated context. Custom claims cannot override protocol claims.
 
 ### Route Middleware
 

@@ -99,6 +99,7 @@ class TokenResponseTypeTest extends TestCase
             'identity' => ['web', TokenResponseTestUser::class, (string) $user->id],
             'client_id' => 'test-client', 'iss' => config('oidc-server.issuer'),
             'sub' => $user->getOidcSubject(),
+            'authentication' => ['auth_time' => time() - 60, 'generation' => str_repeat('a', 64)],
         ];
         request()->merge([
             'grant_type' => 'authorization_code',
@@ -106,6 +107,8 @@ class TokenResponseTypeTest extends TestCase
                 'client_id' => 'test-client', 'user_id' => (string) $user->id, 'oidc' => $context,
             ], JSON_THROW_ON_ERROR), app(PassportKeys::class)->encryptionKey()),
         ]);
+        $this->assertNull(app(AuthorizationContext::class)->forToken($accessToken));
+        request()->attributes->set(AuthorizationContext::TOKEN_ATTRIBUTE, $context);
         $this->assertSame($context, app(AuthorizationContext::class)->forToken($accessToken));
 
         // Context is cached while building the refresh envelope, before the ID Token user lookup.
@@ -148,8 +151,9 @@ class TokenResponseTypeTest extends TestCase
 
         $context = $this->createStub(\Admin9\OidcServer\Services\AuthorizationContext::class);
         $context->method('forToken')->willReturn([
-            'v' => 2, 'identity' => ['web', TokenResponseTestUser::class, (string) $user->id],
+            'v' => 3, 'identity' => ['web', TokenResponseTestUser::class, (string) $user->id],
             'iss' => config('oidc-server.issuer'), 'sub' => $user->getOidcSubject(),
+            'authentication' => ['auth_time' => time() - 60, 'generation' => str_repeat('a', 64)],
         ]);
         $this->app->instance(\Admin9\OidcServer\Services\AuthorizationContext::class, $context);
 

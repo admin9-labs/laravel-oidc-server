@@ -108,11 +108,11 @@ Initiates the OAuth 2.0 Authorization Code flow. The user is presented with a co
 
 - **Method:** `GET`
 - **Path:** `/oauth/authorize`
-- **Authentication:** User session (the user must be logged in)
+- **Authentication:** Explicit host authentication record; guests use the host reauthentication handler
 - **Middleware:** `web` (session-based)
 - **Spec:** [RFC 6749 Section 4.1](https://datatracker.ietf.org/doc/html/rfc6749#section-4.1), [OpenID Connect Core 1.0 Section 3.1.2](https://openid.net/specs/openid-connect-core-1_0.html#AuthorizationEndpoint)
 
-This endpoint is provided by Laravel Passport's built-in `AuthorizationController`. The package also registers `POST /oauth/authorize` (approve) and `DELETE /oauth/authorize` (deny) for handling the consent form submission.
+The package controller owns authorization transactions. `POST /oauth/authorize` approves, `DELETE /oauth/authorize` denies, and `GET /oauth/authorize/continue` consumes a single-use continuation. See the [host and consent contract](upgrading-to-2.0.0.md).
 
 ### Request
 
@@ -138,7 +138,8 @@ Host: your-app.example.com
 | `code_challenge` | Recommended | PKCE code challenge (required when using PKCE) |
 | `code_challenge_method` | Required with `code_challenge` | Must be `S256`; `plain` is rejected |
 | `nonce` | Optional | Exact value bound to the authorization code and initial ID Token; token requests cannot replace it |
-| `max_age` | Unsupported | Any occurrence returns invalid_request to the validated callback; no login is started |
+| `max_age` | Optional | Non-negative integer authentication age; zero requires this transaction’s fresh challenge |
+| `prompt` | Optional | `login`, `consent`, or `none`; `none` cannot be combined |
 
 ### Response (redirect)
 
@@ -151,7 +152,7 @@ Location: https://client.example.com/callback?code=def50200abc...&state=random-c
 
 ## 4. Token Endpoint
 
-Exchanges an authorization code (or refresh token) for an access token. An `id_token` is included when `openid` was granted and the token carries the package's validated OIDC authorization context. Legacy refresh tokens continue issuing OAuth tokens without an ID Token; see [upgrade compatibility](upgrading-to-1.2.2.md#nonce-and-authentication-freshness).
+Exchanges an authorization code (or refresh token) for an access token. An `id_token` is included when `openid` was granted and the token carries the package's validated OIDC authorization context. Old code/refresh tokens return `invalid_grant`; see [2.0 compatibility](upgrading-to-2.0.0.md).
 
 - **Method:** `POST`
 - **Path:** `/oauth/token`
@@ -159,7 +160,7 @@ Exchanges an authorization code (or refresh token) for an access token. An `id_t
 - **Middleware:** Configurable via `oidc-server.routes.token_middleware`
 - **Spec:** [RFC 6749 Section 4.1.3](https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3), [OpenID Connect Core 1.0 Section 3.1.3](https://openid.net/specs/openid-connect-core-1_0.html#TokenEndpoint)
 
-This endpoint uses Passport's built-in `AccessTokenController` and the package's `TokenResponseType`. Nonce comes only from the original authorization code. All ID Tokens omit `auth_time`; refresh also omits nonce. Essential auth_time requests through claims are rejected rather than silently satisfied. No token request parameter can supply either claim.
+This endpoint uses the package controller, protected server and `TokenResponseType`. ID Tokens contain the verified original `auth_time`. Initial nonce comes only from the authorization transaction; refresh omits nonce. Token-body values cannot override either claim.
 
 ### Request (Authorization Code Grant)
 

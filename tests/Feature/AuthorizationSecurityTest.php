@@ -19,7 +19,7 @@ class AuthorizationSecurityTest extends PassportTestCase
         $skips = (new \ReflectionMethod($client, 'skipsAuthorization'))->getNumberOfRequiredParameters() === 0
             ? $client->skipsAuthorization() : $client->skipsAuthorization($user, []);
         $this->assertFalse($skips);
-        Auth::guard('web')->login($user);
+        $this->authenticateUser($user);
         $this->authorize($client)->assertOk()->assertSee('Authorize')->assertSee('Deny');
     }
 
@@ -33,29 +33,33 @@ class AuthorizationSecurityTest extends PassportTestCase
             'client_secret' => 'test-secret', 'refresh_token' => $tokens['refresh_token'],
         ])->assertOk();
         $this->authorize($client)->assertOk();
-        $response = $this->authorize($client, ['prompt' => 'none'])->assertRedirect();
+        $counts = [Passport::authCode()->count(), Passport::token()->count(), Passport::refreshToken()->count()];
+        $state = ' exact + / 中文 state ';
+        $response = $this->authorize($client, ['prompt' => 'none', 'state' => $state])->assertRedirect();
+        $this->assertSame('https://rp.example/callback', strtok($response->headers->get('Location'), '?'));
         parse_str(parse_url($response->headers->get('Location'), PHP_URL_QUERY), $query);
-        $this->assertArrayHasKey('error', $query);
+        $this->assertSame('consent_required', $query['error']);
+        $this->assertSame($state, $query['state']);
         $this->assertArrayNotHasKey('code', $query);
+        $this->assertSame($counts, [Passport::authCode()->count(), Passport::token()->count(), Passport::refreshToken()->count()]);
     }
 
     public function test_pending_approval_cannot_be_reused_by_another_user_or_without_auth_token(): void
     {
         $client = $this->client();
-        Auth::guard('web')->login($this->user());
+        $this->authenticateUser();
         $this->authorize($client)->assertOk();
         $this->post('/oauth/authorize', [])->assertStatus(400);
-        $this->authorize($client)->assertOk();
-        $token = session('authToken');
-        Auth::guard('web')->login($this->user());
-        $this->post('/oauth/authorize', ['auth_token' => $token])->assertStatus(400);
+        $form = $this->consentForm($this->authorize($client)->assertOk());
+        $this->authenticateUser();
+        $this->post('/oauth/authorize', $form)->assertStatus(400);
         $this->assertSame(0, Passport::authCode()->count());
     }
 
     public function test_legacy_pending_authorization_must_be_restarted_after_upgrade(): void
     {
         $client = $this->client();
-        Auth::guard('web')->login($this->user());
+        $this->authenticateUser();
         $this->authorize($client)->assertOk();
         session()->forget('oidc.authorization_pending');
         $this->post('/oauth/authorize', ['auth_token' => session('authToken')])->assertStatus(400);
@@ -72,9 +76,11 @@ class AuthorizationSecurityTest extends PassportTestCase
             ->assertJsonPath('response_types_supported', ['code'])
             ->assertJsonPath('code_challenge_methods_supported', ['S256']);
         $client = $this->client(true);
-        Auth::guard('web')->login($this->user());
+        $this->authenticateUser();
         foreach (['plain', null, 'unsupported'] as $method) {
-            $this->authorize($client, ['code_challenge_method' => $method])->assertStatus(400);
+            $response = $this->authorize($client, ['code_challenge_method' => $method]);
+            $this->assertContains($response->getStatusCode(), [400, 302]);
+            $this->assertSame(0, Passport::authCode()->count());
         }
         $original = Passport::$implicitGrantEnabled;
         Passport::$implicitGrantEnabled = true;
@@ -113,7 +119,7 @@ class AuthorizationSecurityTest extends PassportTestCase
     {
         $client = $this->client();
         $client->forceFill(['name' => '<script>alert(1)</script>'])->save();
-        Auth::guard('web')->login($this->user());
+        $this->authenticateUser();
         $this->authorize($client)->assertOk()
             ->assertDontSee('<script', false)
             ->assertDontSee('cdn.tailwindcss.com', false)

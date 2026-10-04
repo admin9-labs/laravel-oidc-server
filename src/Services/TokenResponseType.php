@@ -33,8 +33,7 @@ class TokenResponseType extends BearerTokenResponse
         }
 
         $context = app(AuthorizationContext::class)->forToken($accessToken);
-        // Legacy refresh tokens can still renew OAuth access, but cannot prove
-        // the original OIDC transaction and identity.
+        // Client credentials and native host grants have no browser authentication.
         if ($context === null) {
             return [];
         }
@@ -63,7 +62,8 @@ class TokenResponseType extends BearerTokenResponse
             $accessToken,
             $user,
             $accessToken->getClient(),
-            $nonce
+            $nonce,
+            $context['authentication']['auth_time'],
         );
 
         OidcTokenIssued::dispatch($user->getKey(), $accessToken->getClient()->getIdentifier(), $scopes);
@@ -90,6 +90,7 @@ class TokenResponseType extends BearerTokenResponse
         $context = app(AuthorizationContext::class)->forToken($this->accessToken);
         if ($context !== null) {
             $payload['oidc'] = $context;
+            app(TokenConsumption::class)->register('refresh', $payload);
         }
 
         return parent::encrypt(json_encode($payload, JSON_THROW_ON_ERROR));

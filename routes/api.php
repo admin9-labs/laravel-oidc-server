@@ -5,7 +5,7 @@ declare(strict_types=1);
 use Admin9\OidcServer\Http\Controllers\OidcController;
 use Admin9\OidcServer\Http\Middleware\EnforceAuthorizationPolicy;
 use Illuminate\Support\Facades\Route;
-use Laravel\Passport\Http\Controllers\AccessTokenController;
+use Admin9\OidcServer\Http\Controllers\AccessTokenController;
 
 /*
 |--------------------------------------------------------------------------

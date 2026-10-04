@@ -21,16 +21,14 @@
         <div class="actions">
             <form method="post" action="{{ route('passport.authorizations.approve') }}">
                 @csrf
-                <input type="hidden" name="state" value="{{ $request->state }}">
-                <input type="hidden" name="client_id" value="{{ $client->getKey() }}">
+                <input type="hidden" name="transaction" value="{{ $transactionId }}">
                 <input type="hidden" name="auth_token" value="{{ $authToken }}">
                 <button type="submit">{{ __('Authorize') }}</button>
             </form>
             <form method="post" action="{{ route('passport.authorizations.deny') }}">
                 @csrf
                 @method('DELETE')
-                <input type="hidden" name="state" value="{{ $request->state }}">
-                <input type="hidden" name="client_id" value="{{ $client->getKey() }}">
+                <input type="hidden" name="transaction" value="{{ $transactionId }}">
                 <input type="hidden" name="auth_token" value="{{ $authToken }}">
                 <button type="submit" class="secondary">{{ __('Deny') }}</button>
             </form>

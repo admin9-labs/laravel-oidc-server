@@ -70,9 +70,9 @@ Member must implement `OidcUserInterface`, use `HasOidcClaims` (or provide its o
 
 An explicit `user_model` must use the same model class as the provider of `passport.guard` (or `auth.defaults.guard` when `passport.guard` is null). The authenticated user and the configured model lookup must return the same runtime PHP class. Different classes are not supported even when they share a table, user ID and OIDC subject. The UserInfo provider must also resolve the same users; unrelated tables can have matching numeric IDs, so changing only `user_model` is unsafe.
 
-By default, Passport handles GET authorization authentication (including `prompt=none`), and POST/DELETE authorization always require the selected guard. Optional `routes.authorization_middleware`, such as `['auth:member_web']`, applies to all three methods without protecting Discovery/JWKS. An authentication middleware on GET runs before Passport and therefore replaces its unauthenticated `prompt=none` handling.
+The package orchestrates GET authorization, including `prompt=none`, through the host's explicit authentication contract. POST/DELETE require valid transaction credentials and an authentication snapshot matching the current selected guard user. Route registration filters `auth`, `auth:*` and the `Illuminate\Auth\Middleware\Authenticate` class name out of `routes.authorization_middleware` so guest and reauthentication requests remain reachable. Remaining middleware applies to all three methods without protecting Discovery/JWKS. A custom authentication middleware that remains on GET can replace the package's `prompt=none` error response with a login redirect.
 
-`/oauth/logout` logs out only the selected guard, clears pending Passport authorization state and that guard's `auth.session` password hash, and rotates the session ID and CSRF token while preserving other session data. Laravel's shared password-confirmation timestamp is also cleared, so a subsequent user must confirm their own password; other logged-in guards may need to reconfirm for sensitive actions. This replaces the previous whole-session invalidation behavior; applications that need to clear additional data should use an `OidcLogoutInitiated` listener. This isolation applies only to the package logout endpoint. Passport handles prompt=login natively and may invalidate the shared session, including other guards. max_age and Essential auth_time requests are rejected; see [the upgrade guide](upgrading-to-1.2.2.md#nonce-and-authentication-freshness).
+`/oauth/logout` logs out only the selected guard, clears pending Passport authorization state and that guard's `auth.session` password hash, and rotates the session ID and CSRF token while preserving other session data. Laravel's shared password-confirmation timestamp is also cleared, so a subsequent user must confirm their own password; other logged-in guards may need to reconfirm for sensitive actions. This replaces the previous whole-session invalidation behavior; applications that need to clear additional data should use an `OidcLogoutInitiated` listener. Reauthentication uses the host contract and preserves other guards. See the [2.0 integration guide](upgrading-to-2.0.0.md) for recorder, handler, shared session/lock and Redis requirements.
 
 ---
 
@@ -82,7 +82,7 @@ By default, Passport handles GET authorization authentication (including `prompt
 |-----|------|---------|
 | `configure_passport` | `bool` | `true` |
 
-When `true`, the package automatically configures Laravel Passport: registers scopes, sets token TTLs, sets the response type, assigns the client model, and registers the authorization view. Set to `false` if you want full manual control over Passport configuration.
+When `true`, the package automatically configures Laravel Passport: registers scopes, sets token TTLs, assigns the client model, and registers the authorization view. The package server always owns its protected grants and response; `false` does not disable its authentication checks.
 
 ---
 
@@ -92,7 +92,17 @@ When `true`, the package automatically configures Laravel Passport: registers sc
 |-----|------|---------|
 | `ignore_passport_routes` | `bool` | `true` |
 
-When `true`, the package calls `Passport::ignoreRoutes()` to prevent Passport from registering its default routes. Set to `false` if you need Passport's built-in routes alongside the OIDC routes.
+When `true`, the package calls `Passport::ignoreRoutes()` to prevent Passport from registering its default routes. When `false`, retained Passport authorization/token routes, including custom prefixes, are protected aliases of the package controllers and enforce the same grant policy. They do not restore password, device or custom user grants. A separate host OAuth entry requires its own controller, native server/response and envelope encryption key; see the [2.0 integration guide](upgrading-to-2.0.0.md#minimal-independent-host-server).
+
+---
+
+### `freshness.redis_connection`
+
+| Key | Type | Default | Env Variable |
+|-----|------|---------|--------------|
+| `freshness.redis_connection` | `string` | `'default'` | `OIDC_FRESHNESS_REDIS_CONNECTION` |
+
+The Laravel Redis connection for shared atomic authentication and one-time code/refresh state. Every web/token worker must use the same authoritative writable Redis server and allow `INFO server` and Lua evaluation. A Redis restart or promotion changes its `run_id` and invalidates the old freshness state. This connection does not configure Laravel's session storage or session-blocking cache store; those must also satisfy the [shared storage and lock requirements](upgrading-to-2.0.0.md#storage-and-routes).
 
 ---
 
@@ -144,6 +154,8 @@ Default scopes:
 | `default_scopes` | `array` | `['openid']` |
 
 Scopes applied automatically when a client does not explicitly request any.
+
+Client credentials requests can also inherit these scopes, including the default `openid`. Such tokens represent the client, carry no user authentication context and never include an ID Token. Hosts should configure/request the scopes needed by their service APIs; the presence of `openid` alone does not establish an authenticated user.
 
 ---
 
@@ -213,7 +225,7 @@ The package endpoints enforce `code`; Discovery reports `['code']` even if an ol
 |-----|------|---------|
 | `grant_types_supported` | `array` | See below |
 
-Grant types advertised in the discovery document. Defaults:
+Retained configuration key. In 2.0 the package endpoint and Discovery use this fixed list, even when an older published configuration advertises other grants:
 
 - `authorization_code`
 - `refresh_token`
@@ -285,7 +297,7 @@ Exact URI allowlist for local confirmed logout without a client. Use `post_logou
 
 - `enabled` -- Set to `false` to disable all routes registered by the package.
 - `discovery_middleware` -- Middleware applied to the `/.well-known/openid-configuration` and JWKS endpoints.
-- `authorization_middleware` -- Additional middleware for GET/POST/DELETE `/oauth/authorize`. POST/DELETE also require authentication via `passport.guard`.
+- `authorization_middleware` -- Additional middleware for GET/POST/DELETE `/oauth/authorize`, with the built-in authentication entries filtered as described above. The package validates transaction credentials and the authentication snapshot against the current `passport.guard` user on POST/DELETE. Remaining custom GET authentication middleware can override the package's silent authorization error handling.
 - `token_middleware` -- Middleware applied to the `/oauth/token`, `/oauth/introspect`, and `/oauth/revoke` endpoints. Logout uses the `web` middleware group for sessions.
 - `userinfo_middleware` -- Middleware applied to the userinfo endpoint. Defaults to `auth:api`.
 
@@ -298,6 +310,7 @@ Upgrade note: authorization no longer inherits `discovery_middleware`. Move any 
 | Variable | Config Key | Type | Default | Description |
 |----------|-----------|------|---------|-------------|
 | `OIDC_ISSUER` | `issuer` | `string` | `APP_URL` | OpenID Connect Issuer Identifier |
+| `OIDC_FRESHNESS_REDIS_CONNECTION` | `freshness.redis_connection` | `string` | `default` | Shared atomic freshness state Redis connection |
 | `OIDC_ACCESS_TOKEN_TTL` | `tokens.access_token_ttl` | `int` | `900` | Access token lifetime in seconds |
 | `OIDC_REFRESH_TOKEN_TTL` | `tokens.refresh_token_ttl` | `int` | `604800` | Refresh token lifetime in seconds |
 | `OIDC_ID_TOKEN_TTL` | `tokens.id_token_ttl` | `int` | `900` | Reserved for future use |

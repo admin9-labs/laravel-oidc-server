@@ -84,6 +84,8 @@ class AuthorizationGuardTest extends TestCase
     {
         Auth::guard('web')->login(GuardTestAdmin::findOrFail(1));
         Auth::guard('member_web')->login(GuardTestMember::findOrFail(1));
+        request()->setLaravelSession(app('session.store'));
+        app(\Admin9\OidcServer\Contracts\AuthenticationRecorder::class)->markAuthenticated('member_web', Auth::guard('member_web')->user());
     }
 
     public function test_authorization_code_and_userinfo_use_member_despite_colliding_admin_id(): void
@@ -93,7 +95,7 @@ class AuthorizationGuardTest extends TestCase
         $this->assertMemberAuthorizationFlow();
     }
 
-    public function test_id_token_and_userinfo_omit_auth_time_from_custom_claims(): void
+    public function test_id_token_uses_recorded_auth_time_and_userinfo_omits_custom_auth_time(): void
     {
         config([
             'oidc-server.scopes.profile.claims' => ['name', 'auth_time'],
@@ -103,7 +105,7 @@ class AuthorizationGuardTest extends TestCase
 
         $tokens = $this->assertMemberAuthorizationFlow();
         $idToken = (new Parser(new JoseEncoder))->parse($tokens['id_token']);
-        $this->assertFalse($idToken->claims()->has('auth_time'));
+        $this->assertSame(session('oidc.freshness.authentications.member_web.auth_time'), $idToken->claims()->get('auth_time'));
 
         Auth::forgetGuards();
         $this->withToken($tokens['access_token'])->getJson('/oauth/userinfo')
@@ -129,7 +131,7 @@ class AuthorizationGuardTest extends TestCase
         $authorization->assertOk();
         $authorization->assertViewHas('user', fn ($user) => $user instanceof GuardTestMember);
 
-        $approved = $this->post('/oauth/authorize', ['auth_token' => session('authToken')]);
+        $approved = $this->post('/oauth/authorize', ['transaction' => $authorization->viewData('transactionId'), 'auth_token' => $authorization->viewData('authToken')]);
         $approved->assertRedirect();
         parse_str(parse_url($approved->headers->get('Location'), PHP_URL_QUERY), $query);
         $this->assertArrayHasKey('code', $query);
@@ -182,7 +184,7 @@ class AuthorizationGuardTest extends TestCase
     {
         Auth::guard('web')->login(GuardTestAdmin::findOrFail(1));
 
-        $this->getJson($this->authorizationUrl($this->createClient()))->assertUnauthorized();
+        $this->getJson($this->authorizationUrl($this->createClient()))->assertStatus(500);
         $this->assertAuthenticatedAs(GuardTestAdmin::findOrFail(1), 'web');
     }
 
@@ -193,19 +195,18 @@ class AuthorizationGuardTest extends TestCase
         $response = $this->get($this->authorizationUrl($this->createClient(), ['prompt' => 'none']));
         $response->assertRedirect();
         parse_str(parse_url($response->headers->get('Location'), PHP_URL_QUERY), $query);
-        $this->assertSame(property_exists(\Laravel\Passport\Passport::class, 'hashesClientSecrets')
-            ? 'access_denied' : 'login_required', $query['error']);
+        $this->assertSame('login_required', $query['error']);
     }
 
     public function test_approve_and_deny_require_member_even_with_pending_authorization(): void
     {
         foreach (['POST', 'DELETE'] as $method) {
             $this->loginBoth();
-            $this->get($this->authorizationUrl($this->createClient(), ['prompt' => 'consent']))->assertOk();
-            $authToken = session('authToken');
+            $view = $this->get($this->authorizationUrl($this->createClient(), ['prompt' => 'consent']))->assertOk();
+            $form = ['transaction' => $view->viewData('transactionId'), 'auth_token' => $view->viewData('authToken')];
             Auth::guard('member_web')->logout();
 
-            $this->json($method, '/oauth/authorize', ['auth_token' => $authToken])->assertUnauthorized();
+            $this->json($method, '/oauth/authorize', $form)->assertStatus(400);
         }
     }
 
@@ -320,13 +321,15 @@ class AuthorizationGuardTest extends TestCase
         Auth::guard('web')->login(GuardTestAdmin::findOrFail(1));
         $client = $this->createClient();
         $response = $this->get($this->authorizationUrl($client, ['max_age' => 60, 'prompt' => 'none']))->assertRedirect();
-        $this->assertStringContainsString('invalid_request', $response->headers->get('Location'));
+        $this->assertStringContainsString('login_required', $response->headers->get('Location'));
+        request()->setLaravelSession(app('session.store'));
+        app(\Admin9\OidcServer\Contracts\AuthenticationRecorder::class)->markAuthenticated('member_web', Auth::guard('member_web')->user());
         $this->assertAuthenticated('member_web');
         $this->assertAuthenticatedAs(GuardTestAdmin::findOrFail(1), 'web');
         $tokens = $this->assertMemberAuthorizationFlow(['nonce' => 'member-nonce']);
         $claims = (new Parser(new JoseEncoder))->parse($tokens['id_token'])->claims();
         $this->assertSame('member-nonce', $claims->get('nonce'));
-        $this->assertFalse($claims->has('auth_time'));
+        $this->assertTrue($claims->has('auth_time'));
         $this->assertAuthenticatedAs(GuardTestAdmin::findOrFail(1), 'web');
     }
 }

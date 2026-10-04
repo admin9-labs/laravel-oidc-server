@@ -29,8 +29,9 @@ return [
     |--------------------------------------------------------------------------
     |
     | When true, the package will automatically configure Passport scopes,
-    | token TTLs, response type, client model, and authorization view.
-    | Set to false if you want to configure Passport yourself.
+    | token TTLs, client model, and authorization view. The package server
+    | always owns its protected grants and response independently of this flag.
+    | Set to false if you want to configure Passport scopes/models/TTLs yourself.
     |
     */
     'configure_passport' => true,
@@ -227,8 +228,9 @@ return [
     |
     | Control route registration and per-group middleware.
     | - discovery_middleware: Applied to /.well-known/* endpoints
-    | - authorization_middleware: Additional middleware for /oauth/authorize;
-    |   Passport handles GET authentication and POST/DELETE require passport.guard
+    | - authorization_middleware: Additional policy middleware for authorization;
+    |   the package owns guest/reauthentication behavior and filters native auth
+    |   middleware. Complete authentication through the recorder/handler contract.
     | - token_middleware: Applied to /oauth/token, introspect, revoke
     | - userinfo_middleware: Applied to /oauth/userinfo (default: auth:api,
     |   which requires a valid Passport access token)

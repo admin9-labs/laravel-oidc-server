@@ -108,11 +108,11 @@ Host: your-app.example.com
 
 - **方法：** `GET`
 - **路径：** `/oauth/authorize`
-- **认证：** 用户会话（用户必须已登录）
+- **认证：** 宿主显式认证记录；游客通过宿主重新认证 handler
 - **中间件：** `web`（基于会话）
 - **规范：** [RFC 6749 Section 4.1](https://datatracker.ietf.org/doc/html/rfc6749#section-4.1)，[OpenID Connect Core 1.0 Section 3.1.2](https://openid.net/specs/openid-connect-core-1_0.html#AuthorizationEndpoint)
 
-此端点由 Laravel Passport 内置的 `AuthorizationController` 提供。该包还注册了 `POST /oauth/authorize`（批准）和 `DELETE /oauth/authorize`（拒绝）用于处理同意表单提交。
+本包控制器管理授权事务。`POST /oauth/authorize` 批准，`DELETE /oauth/authorize` 拒绝，`GET /oauth/authorize/continue` 消费一次性恢复凭证。详见[宿主和表单契约](upgrading-to-2.0.0.md)。
 
 ### 请求
 
@@ -138,7 +138,8 @@ Host: your-app.example.com
 | `code_challenge` | 推荐 | PKCE 代码挑战（使用 PKCE 时必需） |
 | `code_challenge_method` | 传入 `code_challenge` 时必需 | 必须为 `S256`；不接受 `plain` |
 | `nonce` | 可选 | 原样绑定到授权码及首次 ID Token；token 请求不能替换 |
-| `max_age` | 不支持 | 参数存在即向已验证回调返回 invalid_request，不启动登录 |
+| `max_age` | 可选 | 非负整数认证年龄，零要求本事务新挑战 |
+| `prompt` | 可选 | `login`、`consent`、`none`；`none` 不能混用 |
 
 ### 响应（重定向）
 
@@ -151,7 +152,7 @@ Location: https://client.example.com/callback?code=def50200abc...&state=random-c
 
 ## 4. 令牌端点
 
-将授权码（或刷新令牌）交换为访问令牌。授予 openid 且令牌带有包验证的 OIDC 授权上下文时才包含 id_token。旧 Refresh Token 继续生成 OAuth 令牌，但不返回 ID Token，参见[升级兼容策略](upgrading-to-1.2.2.md#nonce-与认证新鲜度)。
+将授权码（或刷新令牌）交换为访问令牌。授予 openid 且令牌带有包验证的 OIDC 授权上下文时才包含 id_token。旧 code/refresh 返回 `invalid_grant`，参见 [2.0 升级策略](upgrading-to-2.0.0.md)。
 
 - **方法：** `POST`
 - **路径：** `/oauth/token`
@@ -159,7 +160,7 @@ Location: https://client.example.com/callback?code=def50200abc...&state=random-c
 - **中间件：** 可通过 `oidc-server.routes.token_middleware` 配置
 - **规范：** [RFC 6749 Section 4.1.3](https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3)，[OpenID Connect Core 1.0 Section 3.1.3](https://openid.net/specs/openid-connect-core-1_0.html#TokenEndpoint)
 
-此端点使用 Passport 内置 AccessTokenController 和包的 TokenResponseType。nonce 仅来自原始授权码，所有 ID Token 省略 auth_time，刷新同时省略 nonce；claims 请求 Essential auth_time 时明确拒绝。token 请求参数不能提供这两个声明。
+此端点使用本包控制器、受保护 server 和 `TokenResponseType`。ID Token 包含经过验证的原 `auth_time`；初次 nonce 仅来自授权事务，refresh 省略 nonce。token 请求体不能覆盖这两个声明。
 
 ### 请求（授权码授予）
 
