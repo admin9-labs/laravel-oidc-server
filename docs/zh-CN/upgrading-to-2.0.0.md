@@ -2,7 +2,7 @@
 
 [English](../upgrading-to-2.0.0.md) | [简体中文](upgrading-to-2.0.0.md)
 
-**这是 2.0 扩展包接入指引。已完成的本地交付检查及单列的业务宿主验收清单见[实施证据](../implementation-2.0.md)。这不代表已经发布或部署。**
+**这是 2.0 正式版扩展包接入指引。历史包检查见[实施证据](../implementation-2.0.md)；后续宿主/RP 验收及剩余限制见[正式版发布范围](../releasing-2.0.0.md)。包发布不代表授权或认证生产部署。**
 
 2.0 对本包的每次授权码事务都要求宿主显式记录真实认证，包括没有 `openid` 的 OAuth 请求。Laravel Login 事件、remember cookie 恢复、`setUser()`、session 创建和用户同意均不能产生可信认证时间。旧 session 没有记录时必须重新认证；旧 code/refresh 返回 `invalid_grant`，不转换，也不提供兼容刷新分支。
 

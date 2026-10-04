@@ -6,9 +6,9 @@
 
 适用于 Laravel Passport 的 OpenID Connect 服务器 — 为任何 Laravel + Passport 应用程序添加 OIDC 发现、JWKS、用户信息、令牌自省、令牌撤销和 RP 发起的登出功能。
 
-此分支实现 2.0 认证契约：真实 `auth_time`、`max_age` 和绑定事务的重新认证。必须完成宿主接入，详见[2.0 升级说明](upgrading-to-2.0.0.md)。
+2.0 版本实现认证契约：真实 `auth_time`、`max_age` 和绑定事务的重新认证。必须完成宿主接入，详见[2.0 升级说明](upgrading-to-2.0.0.md)。
 
-[2.0 设计](authentication-freshness-2.0.md)规定验收条件。本地交付证据及单列的业务宿主验收清单见[实施证据](../implementation-2.0.md)。
+[2.0 设计](authentication-freshness-2.0.md)规定验收条件。历史包交付检查见[实施证据](../implementation-2.0.md)；后续验收及剩余限制见[正式版发布范围](../releasing-2.0.0.md)。
 
 ## 系统要求
 
@@ -17,7 +17,7 @@
 - Laravel Passport 12 或 13
 - 共享服务端 session、session blocking 和 Redis 原子状态
 
-支持组合：Laravel 11/12 + Passport 12/13 使用 PHP 8.2+；Laravel 13 + Passport 13 使用 PHP 8.3+。上游依赖不支持 Laravel 13 + Passport 12。参见[冻结的 RC 范围及发布门禁](../releasing-2.0-rc.md)。
+支持组合：Laravel 11/12 + Passport 12/13 使用 PHP 8.2+；Laravel 13 + Passport 13 使用 PHP 8.3+。上游依赖不支持 Laravel 13 + Passport 12。参见[正式版范围及已知限制](../releasing-2.0.0.md)。
 
 ## 快速开始
 

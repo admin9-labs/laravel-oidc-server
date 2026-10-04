@@ -5,6 +5,16 @@ All notable changes to `admin9/laravel-oidc-server` will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-10-04
+
+### Changed
+
+- Promote the accepted `2.0.0-rc.1` runtime unchanged to stable. The host authentication contract, shared Redis state, supported Laravel/Passport combinations and breaking changes below remain in force.
+- Require coordinated host integration and rollout: old code/refresh formats have no compatibility path, and existing access tokens/database records are not automatically revoked. No package database migration is added.
+- Publish [stable release scope and known limits](docs/releasing-2.0.0.md), including fixed-RC host installation acceptance and the completed minimal real Member-to-RP identity verification. These do not certify full host test suites, every deployment topology or business member login integration.
+
+See the [English](docs/upgrading-to-2.0.0.md) / [中文](docs/zh-CN/upgrading-to-2.0.0.md) upgrade guides before adopting 2.0. The final stable commit requires its own remote CI/dist gates and exact Packagist installation verification; immutable evidence is attached to the GitHub Release.
+
 ## [2.0.0-rc.1] - 2026-10-04
 
 ### Changed

@@ -8,9 +8,9 @@
 
 OpenID Connect Server for Laravel Passport — adds OIDC Discovery, JWKS, UserInfo, Token Introspection, Token Revocation, and RP-Initiated Logout to any Laravel + Passport application.
 
-This branch implements the 2.0 authentication contract: real `auth_time`, `max_age`, and transaction-bound reauthentication. Host integration is required; see the [2.0 upgrade guide](docs/upgrading-to-2.0.0.md).
+Version 2.0 implements the authentication contract: real `auth_time`, `max_age`, and transaction-bound reauthentication. Host integration is required; see the [2.0 upgrade guide](docs/upgrading-to-2.0.0.md).
 
-The [2.0 design](docs/authentication-freshness-2.0.md) defines the acceptance gates. Local delivery evidence and the separate business-host acceptance checklist are recorded in [implementation evidence](docs/implementation-2.0.md).
+The [2.0 design](docs/authentication-freshness-2.0.md) defines the acceptance gates. Historical package delivery checks are recorded in [implementation evidence](docs/implementation-2.0.md); the [stable release scope](docs/releasing-2.0.0.md) records subsequent acceptance and remaining limits.
 
 ## Requirements
 
@@ -19,7 +19,7 @@ The [2.0 design](docs/authentication-freshness-2.0.md) defines the acceptance ga
 - Laravel Passport 12 or 13
 - Shared server-side sessions, session blocking, and shared Redis atomic state
 
-Supported combinations: Laravel 11/12 with Passport 12/13 on PHP 8.2+, and Laravel 13 with Passport 13 on PHP 8.3+. Laravel 13 with Passport 12 is not compatible with upstream requirements. See the [frozen RC scope and gates](docs/releasing-2.0-rc.md).
+Supported combinations: Laravel 11/12 with Passport 12/13 on PHP 8.2+, and Laravel 13 with Passport 13 on PHP 8.3+. Laravel 13 with Passport 12 is not compatible with upstream requirements. See the [stable release scope and known limits](docs/releasing-2.0.0.md).
 
 ## Quick Start
 
