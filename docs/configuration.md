@@ -170,7 +170,7 @@ A map of claim names to model attributes or callables. Entries here take priorit
 ```php
 'claims_resolver' => [
     'nickname' => 'public_name',
-    'picture' => fn ($user) => $user->avatar_url,
+    'picture' => 'avatar_url',
 ],
 ```
 
@@ -203,7 +203,7 @@ Fallback map used by the `HasOidcClaims` trait when no entry exists in `claims_r
 | `tokens.refresh_token_ttl` | `int` | `604800` | `OIDC_REFRESH_TOKEN_TTL` |
 | `tokens.id_token_ttl` | `int` | `900` | `OIDC_ID_TOKEN_TTL` |
 
-All values are in **seconds**.
+Access and refresh TTLs are active and expressed in **seconds**. `tokens.id_token_ttl` and `OIDC_ID_TOKEN_TTL` are reserved and do not control ID Token expiry.
 
 - `access_token_ttl` -- Lifetime of access tokens. Default: 900 (15 minutes).
 - `refresh_token_ttl` -- Lifetime of refresh tokens. Default: 604800 (7 days).

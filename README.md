@@ -36,10 +36,13 @@ composer require admin9/laravel-oidc-server
 ```php
 use Admin9\OidcServer\Contracts\OidcUserInterface;
 use Admin9\OidcServer\Concerns\HasOidcClaims;
+use Illuminate\Foundation\Auth\User as Authenticatable;
 
 class User extends Authenticatable implements OidcUserInterface
 {
-    use HasOidcClaims;
+    use HasOidcClaims {
+        resolveOidcClaim as protected resolveDefaultOidcClaim;
+    }
 
     // Optional: Override for custom claims
     protected function resolveOidcClaim(string $claim): mixed
@@ -47,11 +50,13 @@ class User extends Authenticatable implements OidcUserInterface
         return match ($claim) {
             'nickname' => $this->display_name,
             'picture' => $this->avatar_url,
-            default => parent::resolveOidcClaim($claim),
+            default => $this->resolveDefaultOidcClaim($claim),
         };
     }
 }
 ```
+
+The model override handles its named claims first. Other claims use the trait alias, which checks configured resolvers, `sub`, and the default claims map in that order. A `null` result is omitted.
 
 ### 3. Generate Passport keys
 
@@ -136,6 +141,8 @@ The package calls `Passport::ignoreRoutes()` by default to prevent route conflic
 'ignore_passport_routes' => false,
 ```
 
+Retained Passport authorization/token routes remain protected aliases of the package controllers. This does not restore password, device or custom user grants. A separate host OAuth entry requires its own controller, native server/response and distinct envelope key; see the [independent host OAuth guide](docs/upgrading-to-2.0.0.md#minimal-independent-host-server).
+
 ### Default Claims Map
 
 The `HasOidcClaims` trait resolves standard claims via a configurable map. Override to match your User model's schema:
@@ -144,17 +151,20 @@ The `HasOidcClaims` trait resolves standard claims via a configurable map. Overr
 'default_claims_map' => [
     'name' => 'name',           // string = model attribute
     'email' => 'email',
-    'email_verified' => fn ($user) => $user->email_verified_at !== null,
-    'updated_at' => fn ($user) => $user->updated_at?->timestamp,
+    'email_verified' => [\Admin9\OidcServer\Services\DefaultClaims::class, 'emailVerified'],
+    'updated_at' => [\Admin9\OidcServer\Services\DefaultClaims::class, 'updatedAt'],
 ],
 ```
 
 For custom claims (e.g., `nickname`, `picture`), use `claims_resolver` or override `resolveOidcClaim()` in your User model.
 
+Use attribute strings or static callable arrays when caching configuration. Closures in configuration cannot be serialized by `php artisan config:cache`; update previously published closure mappings before caching.
+
 ### Other Options
 
 - **Scopes & claims mapping** — `scopes`, `claims_resolver`
-- **Token TTLs** — `tokens.access_token_ttl`, `tokens.refresh_token_ttl`, `tokens.id_token_ttl`
+- **Token TTLs** — `tokens.access_token_ttl`, `tokens.refresh_token_ttl`
+- **Reserved ID Token TTL** — `tokens.id_token_ttl` is not active; ID Token expiry follows the access token expiry
 - **Route middleware** — `routes.discovery_middleware`, `routes.token_middleware`, `routes.userinfo_middleware`
 - **Passport auto-configuration** — `configure_passport` (set to `false` to configure Passport yourself)
 
@@ -176,3 +186,5 @@ See the [Configuration Reference](docs/configuration.md) for all available optio
 ## Security upgrade
 
 Read the [2.0 upgrade guide](docs/upgrading-to-2.0.0.md) for logout confirmation, exact callbacks, resource-server authorization and historical-grant handling.
+
+See the published [security advisory GHSA-7wgf-3xc4-jx69](https://github.com/admin9-labs/laravel-oidc-server/security/advisories/GHSA-7wgf-3xc4-jx69) for the original report, fixed versions and maintainer follow-up.

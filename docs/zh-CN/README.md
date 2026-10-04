@@ -34,10 +34,13 @@ composer require admin9/laravel-oidc-server
 ```php
 use Admin9\OidcServer\Contracts\OidcUserInterface;
 use Admin9\OidcServer\Concerns\HasOidcClaims;
+use Illuminate\Foundation\Auth\User as Authenticatable;
 
 class User extends Authenticatable implements OidcUserInterface
 {
-    use HasOidcClaims;
+    use HasOidcClaims {
+        resolveOidcClaim as protected resolveDefaultOidcClaim;
+    }
 
     // Optional: Override for custom claims
     protected function resolveOidcClaim(string $claim): mixed
@@ -45,11 +48,13 @@ class User extends Authenticatable implements OidcUserInterface
         return match ($claim) {
             'nickname' => $this->display_name,
             'picture' => $this->avatar_url,
-            default => parent::resolveOidcClaim($claim),
+            default => $this->resolveDefaultOidcClaim($claim),
         };
     }
 }
 ```
+
+模型重写先处理指定声明；其余声明调用 trait 别名，依次检查配置解析器、`sub` 和默认声明映射。返回 `null` 的声明会被省略。
 
 ### 3. 生成 Passport 密钥
 
@@ -134,6 +139,8 @@ https://your-app.test/.well-known/openid-configuration
 'ignore_passport_routes' => false,
 ```
 
+保留的 Passport 授权/token 路由仍是本包控制器的受保护别名，不会恢复 password、device 或自定义用户 grant。独立宿主 OAuth 入口需要自己的控制器、原生 server/response 和独立 envelope 密钥，参见[独立宿主 OAuth 指引](upgrading-to-2.0.0.md#宿主独立-server-的最小接法)。
+
 ### 默认声明映射
 
 `HasOidcClaims` trait 通过可配置的映射解析标准声明。覆盖以匹配您的 User 模型架构：
@@ -142,17 +149,20 @@ https://your-app.test/.well-known/openid-configuration
 'default_claims_map' => [
     'name' => 'name',           // string = model attribute
     'email' => 'email',
-    'email_verified' => fn ($user) => $user->email_verified_at !== null,
-    'updated_at' => fn ($user) => $user->updated_at?->timestamp,
+    'email_verified' => [\Admin9\OidcServer\Services\DefaultClaims::class, 'emailVerified'],
+    'updated_at' => [\Admin9\OidcServer\Services\DefaultClaims::class, 'updatedAt'],
 ],
 ```
 
 对于自定义声明（例如 `nickname`、`picture`），请使用 `claims_resolver` 或在您的 User 模型中覆盖 `resolveOidcClaim()`。
 
+需要配置缓存时，使用属性字符串或静态 callable 数组。配置闭包无法通过 `php artisan config:cache` 序列化；缓存前需更新已发布的旧闭包映射。
+
 ### 其他选项
 
 - **作用域和声明映射** — `scopes`、`claims_resolver`
-- **令牌 TTL** — `tokens.access_token_ttl`、`tokens.refresh_token_ttl`、`tokens.id_token_ttl`
+- **令牌 TTL** — `tokens.access_token_ttl`、`tokens.refresh_token_ttl`
+- **保留的 ID Token TTL** — `tokens.id_token_ttl` 尚未启用；ID Token 到期时间跟随 access token
 - **路由中间件** — `routes.discovery_middleware`、`routes.token_middleware`、`routes.userinfo_middleware`
 - **Passport 自动配置** — `configure_passport`（设置为 `false` 以自行配置 Passport）
 
@@ -174,3 +184,5 @@ https://your-app.test/.well-known/openid-configuration
 ## 安全升级
 
 请阅读 [2.0 升级指引](upgrading-to-2.0.0.md)，调整退出确认、精确回调、资源服务器查询权限及历史授权处置。
+
+已发布的[安全公告 GHSA-7wgf-3xc4-jx69](https://github.com/admin9-labs/laravel-oidc-server/security/advisories/GHSA-7wgf-3xc4-jx69)记录了原始报告、修复版本和维护者后续说明。

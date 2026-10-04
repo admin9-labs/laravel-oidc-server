@@ -170,7 +170,7 @@ Client credentials 请求也可能继承这些作用域，包括默认的 `openi
 ```php
 'claims_resolver' => [
     'nickname' => 'public_name',
-    'picture' => fn ($user) => $user->avatar_url,
+    'picture' => 'avatar_url',
 ],
 ```
 
@@ -203,7 +203,7 @@ Client credentials 请求也可能继承这些作用域，包括默认的 `openi
 | `tokens.refresh_token_ttl` | `int` | `604800` | `OIDC_REFRESH_TOKEN_TTL` |
 | `tokens.id_token_ttl` | `int` | `900` | `OIDC_ID_TOKEN_TTL` |
 
-所有值的单位均为**秒**。
+Access/refresh TTL 已启用，单位为**秒**。`tokens.id_token_ttl` 和 `OIDC_ID_TOKEN_TTL` 为保留配置，不控制 ID Token 到期时间。
 
 - `access_token_ttl` -- 访问令牌的生命周期。默认：900（15 分钟）。
 - `refresh_token_ttl` -- 刷新令牌的生命周期。默认：604800（7 天）。
