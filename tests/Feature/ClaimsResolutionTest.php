@@ -89,6 +89,23 @@ class ClaimsResolutionTest extends TestCase
         $this->assertEquals('JOHN DOE', $claims['name']);
     }
 
+    public function test_default_configuration_survives_cache_and_preserves_claim_values(): void
+    {
+        $cached = eval('return '.var_export(config('oidc-server'), true).';');
+        config(['oidc-server' => $cached]);
+
+        $user = new TestUser;
+        $claims = $user->getOidcClaims(['profile', 'email']);
+        $this->assertFalse($claims['email_verified']);
+        $this->assertArrayNotHasKey('updated_at', $claims);
+
+        $user->email_verified_at = '2026-10-04 12:00:00';
+        $user->updated_at = \Carbon\Carbon::createFromTimestampUTC(1791115200);
+        $claims = $user->getOidcClaims(['profile', 'email']);
+        $this->assertTrue($claims['email_verified']);
+        $this->assertSame(1791115200, $claims['updated_at']);
+    }
+
     public function test_has_oidc_claims_trait_returns_null_for_unknown_claims(): void
     {
         config([

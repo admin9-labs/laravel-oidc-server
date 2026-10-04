@@ -176,6 +176,8 @@ Client credentials 请求也可能继承这些作用域，包括默认的 `openi
 
 ---
 
+包内默认映射使用静态 callable 数组，支持 `php artisan config:cache`。需要配置缓存的自定义 resolver 应使用属性字符串或 `[\App\Support\OidcClaims::class, 'picture']` 这类静态 callable 数组；配置中的闭包无法序列化。已发布的旧配置若含闭包，缓存前需同步替换。
+
 ### `default_claims_map`
 
 | Key | Type | Default |

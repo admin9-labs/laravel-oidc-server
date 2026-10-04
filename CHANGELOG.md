@@ -18,6 +18,9 @@ See the [English](docs/upgrading-to-2.0.0.md) / [中文](docs/zh-CN/upgrading-to
 
 ### Fixed
 
+- Make shipped default claim resolvers serializable for Laravel configuration caching while preserving email verification and update-time semantics. Previously published closures need replacement before `config:cache`.
+- Avoid a private test-helper collision with current Testbench's public `query()` method; retain every authentication-freshness assertion.
+
 - Return `invalid_request` for missing, blank or non-string refresh parameters while preserving client authentication precedence and `invalid_grant` for invalid credentials.
 - Verify the exact `consent_required` response, callback/state preservation and absence of new credentials during silent authorization requiring consent.
 - Update English/Chinese configuration guidance for authentication orchestration, retained routes, the freshness Redis connection and client credentials scope semantics.

@@ -176,6 +176,8 @@ A map of claim names to model attributes or callables. Entries here take priorit
 
 ---
 
+The shipped defaults use static callable arrays so `php artisan config:cache` works. For custom resolvers used with config caching, use attribute strings or static callable arrays such as `[\App\Support\OidcClaims::class, 'picture']`; closures in configuration cannot be serialized. Existing published configuration with closures must be updated before caching.
+
 ### `default_claims_map`
 
 | Key | Type | Default |

@@ -6,6 +6,8 @@
 
 2.0 requires an explicit host authentication contract for every authorization-code transaction, including OAuth requests without `openid`. A Laravel login, remembered user, `setUser()`, session creation, or successful consent does not establish an authentication time. Existing sessions without a record must authenticate again. Old code/refresh envelopes are rejected with `invalid_grant`; there is no conversion or compatibility refresh path.
 
+
+Before running `config:cache`, update previously published `default_claims_map` closures to the new static callable arrays. Custom claim resolvers must also be serializable; see [claims configuration](configuration.md#default_claims_map).
 ## Storage and routes
 
 Use server-side sessions shared by all application nodes. Cookie and array session drivers are rejected on package authorization routes. Use Laravel session blocking on host login, reauthentication and logout routes; package authorize, approve, deny, continue and logout routes already call `block()`. The cache store used by Laravel session blocking must support shared atomic locks. Keep CSRF and host authentication rate limits on the host POST routes.

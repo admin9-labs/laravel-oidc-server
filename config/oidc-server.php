@@ -132,8 +132,8 @@ return [
     'default_claims_map' => [
         'name' => 'name',
         'email' => 'email',
-        'email_verified' => fn ($user) => $user->email_verified_at !== null,
-        'updated_at' => fn ($user) => $user->updated_at?->timestamp,
+        'email_verified' => [\Admin9\OidcServer\Services\DefaultClaims::class, 'emailVerified'],
+        'updated_at' => [\Admin9\OidcServer\Services\DefaultClaims::class, 'updatedAt'],
     ],
 
     /*

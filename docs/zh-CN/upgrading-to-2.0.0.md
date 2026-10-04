@@ -6,6 +6,8 @@
 
 2.0 对本包的每次授权码事务都要求宿主显式记录真实认证，包括没有 `openid` 的 OAuth 请求。Laravel Login 事件、remember cookie 恢复、`setUser()`、session 创建和用户同意均不能产生可信认证时间。旧 session 没有记录时必须重新认证；旧 code/refresh 返回 `invalid_grant`，不转换，也不提供兼容刷新分支。
 
+
+执行 `config:cache` 前，将已发布的旧 `default_claims_map` 闭包同步为新的静态 callable 数组；自定义声明 resolver 也必须可序列化，参见[声明配置](configuration.md#default_claims_map)。
 ## 存储与路由
 
 所有节点使用共享的服务端 session。包授权入口拒绝 cookie/array session。宿主登录、重新认证和退出路由必须启用 Laravel session blocking；包内 authorize、approve、deny、continue 和 logout 已调用 `block()`。session blocking 使用的 cache store 必须支持共享原子锁。宿主 POST 入口保留 CSRF 和认证限流。

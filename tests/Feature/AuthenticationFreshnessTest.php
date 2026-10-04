@@ -58,7 +58,7 @@ class AuthenticationFreshnessTest extends PassportTestCase
         return ['transaction' => $response->viewData('transactionId'), 'auth_token' => $response->viewData('authToken')];
     }
 
-    private function query($response): array
+    private function authorizationQuery($response): array
     {
         parse_str(parse_url($response->headers->get('Location'), PHP_URL_QUERY) ?? '', $query);
 
@@ -77,7 +77,7 @@ class AuthenticationFreshnessTest extends PassportTestCase
         $authTime = time() - 50;
         $this->login($authTime);
         $view = $this->authorize($client, ['nonce' => ' exact nonce ', 'max_age' => '60'])->assertOk();
-        $code = $this->query($this->post('/oauth/authorize', $this->approval($view))->assertRedirect())['code'];
+        $code = $this->authorizationQuery($this->post('/oauth/authorize', $this->approval($view))->assertRedirect())['code'];
         Auth::guard('web')->logout();
         session()->flush();
         $tokens = $this->exchange($client, $code)->assertOk()->json();
@@ -98,7 +98,7 @@ class AuthenticationFreshnessTest extends PassportTestCase
         $client = $this->client();
         Auth::guard('web')->login($this->user(), true);
         $silent = $this->authorize($client, ['prompt' => 'none'])->assertRedirect();
-        $this->assertSame('login_required', $this->query($silent)['error']);
+        $this->assertSame('login_required', $this->authorizationQuery($silent)['error']);
         $interactive = $this->authorize($client)->assertRedirect();
         $this->assertSame('/test-reauth', parse_url($interactive->headers->get('Location'), PHP_URL_PATH));
         $this->assertSame(0, Passport::authCode()->count());
@@ -108,13 +108,13 @@ class AuthenticationFreshnessTest extends PassportTestCase
     {
         $client = $this->client();
         $user = $this->user();
-        $challenge = $this->query($this->authorize($client, ['max_age' => 0])->assertRedirect());
+        $challenge = $this->authorizationQuery($this->authorize($client, ['max_age' => 0])->assertRedirect());
         $completed = $this->post('/test-reauth', $challenge + ['user' => $user->id])->assertRedirect();
         $resume = $completed->headers->get('Location');
         $view = $this->get($resume)->assertOk();
         $this->get($resume)->assertStatus(400);
         $approved = $this->post('/oauth/authorize', $this->approval($view))->assertRedirect();
-        $this->exchange($client, $this->query($approved)['code'])->assertOk();
+        $this->exchange($client, $this->authorizationQuery($approved)['code'])->assertOk();
         $this->post('/test-reauth', $challenge + ['user' => $user->id])->assertStatus(400);
     }
 
@@ -123,13 +123,13 @@ class AuthenticationFreshnessTest extends PassportTestCase
         $client = $this->client();
         $user = $this->user();
         $state = ' exact + / 中文 ';
-        $challenge = $this->query($this->authorize($client, [
+        $challenge = $this->authorizationQuery($this->authorize($client, [
             'max_age' => 0, 'scope' => 'profile', 'redirect_uri' => null, 'state' => $state,
         ])->assertRedirect());
         $completed = $this->post('/test-reauth', $challenge + ['user' => $user->id])->assertRedirect();
         $view = $this->get($completed->headers->get('Location'))->assertOk();
         $approved = $this->post('/oauth/authorize', $this->approval($view))->assertRedirect();
-        $query = $this->query($approved);
+        $query = $this->authorizationQuery($approved);
         $this->assertSame($state, $query['state']);
         $this->assertSame('https://rp.example/callback', strtok($approved->headers->get('Location'), '?'));
         $this->postJson('/oauth/token', ['grant_type' => 'authorization_code', 'client_id' => $client->id,
@@ -141,12 +141,12 @@ class AuthenticationFreshnessTest extends PassportTestCase
     {
         $client = $this->client();
         $user = $this->login();
-        $first = $this->query($this->authorize($client, ['prompt' => 'login', 'max_age' => 60])->assertRedirect());
+        $first = $this->authorizationQuery($this->authorize($client, ['prompt' => 'login', 'max_age' => 60])->assertRedirect());
         $resume = $this->post('/test-reauth', $first + ['user' => $user->id])->assertRedirect()->headers->get('Location');
         $view = $this->get($resume)->assertOk();
         $form = $this->approval($view);
         $this->travel(61)->seconds();
-        $second = $this->query($this->post('/oauth/authorize', $form)->assertRedirect());
+        $second = $this->authorizationQuery($this->post('/oauth/authorize', $form)->assertRedirect());
         $this->assertNotSame($first['challenge'], $second['challenge']);
         $this->post('/oauth/authorize', $form)->assertStatus(400);
         $resume = $this->post('/test-reauth', $second + ['user' => $user->id])->assertRedirect()->headers->get('Location');
@@ -160,15 +160,15 @@ class AuthenticationFreshnessTest extends PassportTestCase
     {
         $client = $this->client();
         $user = $this->login();
-        $challenge = $this->query($this->authorize($client, ['prompt' => 'login'])->assertRedirect());
+        $challenge = $this->authorizationQuery($this->authorize($client, ['prompt' => 'login'])->assertRedirect());
         $this->post('/test-reauth', $challenge + ['user' => $user->id, 'time' => now()->timestamp - 100])->assertStatus(400);
         $this->assertSame(0, Passport::authCode()->count());
-        $challenge = $this->query($this->authorize($client, ['prompt' => 'login'])->assertRedirect());
+        $challenge = $this->authorizationQuery($this->authorize($client, ['prompt' => 'login'])->assertRedirect());
         $this->post('/test-reauth', $challenge + ['user' => $this->user()->id])->assertStatus(400);
         Auth::guard('web')->login($user);
         request()->setLaravelSession(app('session.store'));
         app(AuthenticationRecorder::class)->markAuthenticated('web', $user);
-        $challenge = $this->query($this->authorize($client, ['prompt' => 'login'])->assertRedirect());
+        $challenge = $this->authorizationQuery($this->authorize($client, ['prompt' => 'login'])->assertRedirect());
         Route::middleware('web')->post('/test-complete-only', function (Request $request) {
             $service = app(ReauthenticationService::class);
 
@@ -185,8 +185,8 @@ class AuthenticationFreshnessTest extends PassportTestCase
         $admin = $this->user();
         Auth::guard('admin')->login($admin);
         $client = $this->client();
-        $first = $this->query($this->authorize($client, ['max_age' => '000'])->assertRedirect());
-        $second = $this->query($this->authorize($client, ['max_age' => 0])->assertRedirect());
+        $first = $this->authorizationQuery($this->authorize($client, ['max_age' => '000'])->assertRedirect());
+        $second = $this->authorizationQuery($this->authorize($client, ['max_age' => 0])->assertRedirect());
         $this->post('/test-reauth', ['transaction' => $first['transaction'], 'challenge' => $second['challenge'], 'user' => $user->id])->assertStatus(400);
         $completed = $this->post('/test-reauth', $first + ['user' => $user->id])->assertRedirect();
         $this->assertAuthenticatedAs($admin, 'admin');
@@ -201,7 +201,7 @@ class AuthenticationFreshnessTest extends PassportTestCase
         $client = $this->client();
         $user = $this->login();
         $old = $this->approval($this->authorize($client)->assertOk());
-        $challenge = $this->query($this->authorize($client, ['prompt' => 'login'])->assertRedirect());
+        $challenge = $this->authorizationQuery($this->authorize($client, ['prompt' => 'login'])->assertRedirect());
         $this->post('/test-reauth', $challenge + ['user' => $user->id])->assertRedirect();
         $this->post('/oauth/authorize', $old)->assertStatus(400);
         $this->assertSame(0, Passport::authCode()->count());
@@ -239,7 +239,7 @@ class AuthenticationFreshnessTest extends PassportTestCase
     {
         $client = $this->client();
         $user = $this->login();
-        $challenge = $this->query($this->authorize($client, ['prompt' => 'login'])->assertRedirect());
+        $challenge = $this->authorizationQuery($this->authorize($client, ['prompt' => 'login'])->assertRedirect());
         $client->forceFill(['revoked' => true])->save();
         $response = $this->post('/test-reauth', $challenge + ['user' => $user->id])->assertStatus(400);
         $this->assertFalse($response->headers->has('Location'));
@@ -253,7 +253,7 @@ class AuthenticationFreshnessTest extends PassportTestCase
         $client = $this->client();
         $this->login();
         $view = $this->authorize($client, ['scope' => 'profile'])->assertOk();
-        $code = $this->query($this->post('/oauth/authorize', $this->approval($view))->assertRedirect())['code'];
+        $code = $this->authorizationQuery($this->post('/oauth/authorize', $this->approval($view))->assertRedirect())['code'];
         $context = app(TokenVerifier::class)->encryptedPayload($code)['oidc'];
         $this->assertSame(3, $context['v']);
         $tokens = $this->exchange($client, $code)->assertOk()->assertJsonMissingPath('id_token')->json();
@@ -269,7 +269,7 @@ class AuthenticationFreshnessTest extends PassportTestCase
         $this->login($time);
         $this->travel(59)->seconds();
         $view = $this->authorize($client, ['max_age' => 60])->assertOk();
-        $code = $this->query($this->post('/oauth/authorize', $this->approval($view))->assertRedirect())['code'];
+        $code = $this->authorizationQuery($this->post('/oauth/authorize', $this->approval($view))->assertRedirect())['code'];
         $this->travel(6)->seconds();
         $tokens = $this->exchange($client, $code)->assertOk()->json();
         $this->travel(3600)->seconds();
@@ -294,9 +294,9 @@ class AuthenticationFreshnessTest extends PassportTestCase
         try {
             $client = $this->client();
             $silent = $this->authorize($client, ['prompt' => 'none'])->assertRedirect();
-            $this->assertSame('login_required', $this->query($silent)['error']);
+            $this->assertSame('login_required', $this->authorizationQuery($silent)['error']);
             $user = $this->login();
-            $challenge = $this->query($this->authorize($client, ['prompt' => 'login consent'])->assertRedirect());
+            $challenge = $this->authorizationQuery($this->authorize($client, ['prompt' => 'login consent'])->assertRedirect());
             $completed = $this->post('/test-reauth', $challenge + ['user' => $user->id])->assertRedirect();
             $this->get($completed->headers->get('Location'))->assertOk()->assertSee('Authorize');
             $this->assertSame(0, Passport::authCode()->count());
@@ -347,11 +347,11 @@ class AuthenticationFreshnessTest extends PassportTestCase
         })->block();
         $client = $this->client();
         $user = $this->login();
-        $first = $this->query($this->authorize($client, ['prompt' => 'login', 'state' => 'exact cancel state'])->assertRedirect());
-        $second = $this->query($this->authorize($client, ['prompt' => 'login'])->assertRedirect());
+        $first = $this->authorizationQuery($this->authorize($client, ['prompt' => 'login', 'state' => 'exact cancel state'])->assertRedirect());
+        $second = $this->authorizationQuery($this->authorize($client, ['prompt' => 'login'])->assertRedirect());
         $cancelled = $this->post('/test-cancel', $first)->assertRedirect();
-        $this->assertSame('access_denied', $this->query($cancelled)['error']);
-        $this->assertSame('exact cancel state', $this->query($cancelled)['state']);
+        $this->assertSame('access_denied', $this->authorizationQuery($cancelled)['error']);
+        $this->assertSame('exact cancel state', $this->authorizationQuery($cancelled)['state']);
         $this->post('/test-reauth', $first + ['user' => $user->id])->assertStatus(400);
         $this->post('/test-reauth', $second + ['user' => $user->id])->assertRedirect();
         $this->assertSame(0, Passport::authCode()->count());
@@ -361,7 +361,7 @@ class AuthenticationFreshnessTest extends PassportTestCase
     {
         $client = $this->client();
         $user = $this->login();
-        $challenge = $this->query($this->authorize($client, ['prompt' => 'login'])->assertRedirect());
+        $challenge = $this->authorizationQuery($this->authorize($client, ['prompt' => 'login'])->assertRedirect());
         $this->travel(301)->seconds();
         $this->post('/test-reauth', $challenge + ['user' => $user->id])->assertStatus(400);
         $this->travelBack();
@@ -407,7 +407,7 @@ class AuthenticationFreshnessTest extends PassportTestCase
             $client = $this->client();
             $user = $this->login();
             $old = app(AuthenticationRecorder::class)->current('web');
-            $challenge = $this->query($this->authorize($client, ['max_age' => 0])->assertRedirect());
+            $challenge = $this->authorizationQuery($this->authorize($client, ['max_age' => 0])->assertRedirect());
             $response = $this->post('/test-reauth', $challenge + ['user' => $user->id])->assertRedirect();
             $tx = session('oidc.freshness.transactions.'.$challenge['transaction']);
             $this->assertSame($old->authTime, $tx['authentication_snapshot']['auth_time']);
