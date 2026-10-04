@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 candidate_sha=${1:?Usage: install-dist.sh <full-commit-sha> [exact-release-version]}
-candidate_constraint=${2:-2.0.x-dev#$candidate_sha}
+candidate_constraint=${2:-dev-main#$candidate_sha}
 [[ "$candidate_sha" =~ ^[0-9a-f]{40}$ ]]
 fixture_root=$(mktemp -d /tmp/oidc-dist.XXXXXX)
 export COMPOSER_HOME="$fixture_root/composer-home"

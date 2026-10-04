@@ -2,7 +2,7 @@ name: Tests
 
 on:
   push:
-    branches: [main, '2.0']
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -118,7 +118,7 @@ jobs:
 
   clean-install:
     name: Clean dist / PHP 8.3 / Laravel 13 / Passport 13
-    if: github.ref == 'refs/heads/2.0'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
