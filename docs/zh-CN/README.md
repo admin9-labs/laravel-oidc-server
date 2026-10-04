@@ -17,6 +17,8 @@
 - Laravel Passport 12 或 13
 - 共享服务端 session、session blocking 和 Redis 原子状态
 
+支持组合：Laravel 11/12 + Passport 12/13 使用 PHP 8.2+；Laravel 13 + Passport 13 使用 PHP 8.3+。上游依赖不支持 Laravel 13 + Passport 12。参见[冻结的 RC 范围及发布门禁](../releasing-2.0-rc.md)。
+
 ## 快速开始
 
 > **前置条件：** 在使用本扩展包之前，必须先安装并配置 [Laravel Passport](https://laravel.com/docs/passport)。

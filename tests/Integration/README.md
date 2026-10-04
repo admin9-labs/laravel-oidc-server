@@ -109,7 +109,7 @@ The check first rejects a wrong password, then establishes a real upstream sessi
 
 ### Manual GitHub Actions run
 
-Once the workflow is available on the repository's default branch, open **Actions → Integration SSO → Run workflow** and select the ref to validate. It runs only on `workflow_dispatch`, independently of the seven-combination PHPUnit/Pest matrix. The Ubuntu job uses PHP 8.3, Laravel 13, Passport 13, Testbench 11, Pest 4, PHPUnit 12 and Node 22.x, with Redis, DOM and SQLite support. It has a 15-minute timeout, read-only repository permissions and requires no production credentials.
+Pushing the `2.0` branch runs this workflow and the independent seven-combination PHPUnit/Pest matrix on the exact pushed commit. This does not require merging `2.0` into the default branch. Manual `workflow_dispatch` is also retained; the Actions UI requires the workflow on the default branch before offering that button. The Ubuntu job uses PHP 8.3, Laravel 13, Passport 13, Testbench 11, Pest 4, PHPUnit 12 and Node 22.x, with Redis, DOM and SQLite support. It has a 15-minute timeout, read-only repository permissions and requires no production credentials.
 
 The job invokes the same `run-sso.sh`, including its connection-failure exit-status control and the committed npm lockfile. A failed assertion or setup failure fails the job. Successful runs retain only the sanitized `sso-results.json` under the `sso-results-<commit SHA>` artifact for seven days; private keys, settings, sessions and token-bearing runtime files are not uploaded. The runner prints its private runtime path for local inspection. Check the run's commit and resolved dependencies when recording acceptance evidence.
 
@@ -126,3 +126,19 @@ In the same browser, visit the host's `/sso/start`; use `member@upstream.test` /
 The disposable upstream uses an in-memory adapter and loopback HTTP. It proves actual protocol/session behavior locally, not production IdP deployment. Business-host identity mapping, factors, active-authentication semantics, TLS, shared-state topology and cutover must be accepted separately with that host's provider. In particular, a signature and timestamp alone cannot establish active authentication: the host must verify the provider honored this challenge; second-level equality does not prove a new event.
 
 Stop the RP, PHP workers and dedicated Redis when finished. The runtime directory contains test private keys and temporary sessions; never commit it.
+
+## Clean candidate distribution installation
+
+After pushing a fixed candidate to the public `2.0` branch, run:
+
+```sh
+bash tests/Integration/install-dist.sh <full-commit-sha>
+```
+
+The `Tests` workflow also runs it on every `2.0` push. It installs a separate Laravel 13 / Passport 13 production dependency tree using a new Composer home and cache, with `2.0.x-dev#<sha>` from the public GitHub VCS repository and `--prefer-dist`. It rejects source/path installation, verifies every distributed file against `git archive <sha>`, checks platform requirements, automatic provider discovery, configuration/route caching, discovery/JWKS HTTP responses and consent-view rendering. No package test autoloading or Testbench is present. Only sanitized `dist-results.json` is uploaded. This installation check supplements the real SSO fixture; it does not claim business-host integration.
+
+After Packagist indexes the RC, the same script verifies the actual exact version without a custom repository:
+
+```sh
+bash tests/Integration/install-dist.sh <full-commit-sha> 2.0.0-rc.1
+```

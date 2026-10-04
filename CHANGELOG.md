@@ -5,7 +5,7 @@ All notable changes to `admin9/laravel-oidc-server` will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.0-rc.1] - 2026-10-04
 
 ### Changed
 
@@ -24,7 +24,9 @@ See the [English](docs/upgrading-to-2.0.0.md) / [中文](docs/zh-CN/upgrading-to
 
 ### Added
 
-- A manually triggered `Integration SSO` workflow using the existing real upstream SSO and independent RP runner, with sanitized result artifacts.
+- Remote `2.0` push gates for the seven-combination PHPUnit/Pest matrix and the existing real upstream SSO runner, with sanitized artifacts.
+- A fixed-commit, public GitHub dist installation into an independent Laravel 13 host without package development or local path dependencies; validates platform requirements, exact archive content, provider discovery, cached configuration/routes, discovery/JWKS and the distributed consent view.
+- Frozen RC scope and installation/release gates in [candidate release guidance](docs/releasing-2.0-rc.md).
 
 ## [1.2.2] - 2026-09-24
 

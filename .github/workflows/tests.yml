@@ -2,8 +2,12 @@ name: Tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, '2.0']
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   tests:
@@ -111,3 +115,25 @@ jobs:
 
       - name: Run Pest
         run: vendor/bin/pest
+
+  clean-install:
+    name: Clean dist / PHP 8.3 / Laravel 13 / Passport 13
+    if: github.ref == 'refs/heads/2.0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, openssl, pdo, sqlite, pdo_sqlite, redis, dom
+          coverage: none
+      - name: Install fixed candidate in an independent production dependency tree
+        run: bash tests/Integration/install-dist.sh "${{ github.sha }}"
+      - name: Save sanitized distribution evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist-results-${{ github.sha }}
+          path: /tmp/oidc-dist.*/host/dist-results.json
+          if-no-files-found: error
+          retention-days: 7
