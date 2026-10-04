@@ -34,6 +34,7 @@ class OidcServerServiceProvider extends PackageServiceProvider
     public function packageRegistered(): void
     {
         $this->app->bind(\Admin9\OidcServer\Contracts\AtomicStateStore::class, \Admin9\OidcServer\Services\RedisAtomicStateStore::class);
+        $this->app->bind(\Admin9\OidcServer\Contracts\AuthenticationRecorder::class, \Admin9\OidcServer\Services\SessionAuthenticationRecorder::class);
         // Registration must precede Passport's boot(), including a custom route prefix.
         if (config('oidc-server.ignore_passport_routes', true)) {
             Passport::ignoreRoutes();
@@ -71,6 +72,11 @@ class OidcServerServiceProvider extends PackageServiceProvider
                     && ! in_array(EnforceAuthorizationPolicy::class, $route->middleware(), true)) {
                     $route->middleware(EnforceAuthorizationPolicy::class);
                 }
+            }
+        });
+        \Illuminate\Support\Facades\Event::listen(\Illuminate\Auth\Events\Logout::class, function ($event): void {
+            if (request()->hasSession()) {
+                app(\Admin9\OidcServer\Contracts\AuthenticationRecorder::class)->forget($event->guard);
             }
         });
     }
