@@ -1,0 +1,57 @@
+name: Integration SSO
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sso:
+    name: PHP 8.3 / Laravel 13 / Passport 13 / Node 22
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, openssl, pdo, sqlite, pdo_sqlite, redis, dom
+          coverage: none
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Install Redis
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes redis-server
+
+      - name: Install PHP dependencies
+        run: |
+          composer update \
+            --with laravel/framework:^13.0 \
+            --with laravel/passport:^13.0 \
+            --with orchestra/testbench:^11.0 \
+            --with pestphp/pest:^4.0 \
+            --with phpunit/phpunit:^12.0 \
+            --with-all-dependencies \
+            --no-interaction \
+            --prefer-dist
+
+      - name: Run real upstream SSO acceptance
+        run: bash tests/Integration/run-sso.sh
+
+      - name: Save sanitized SSO results
+        uses: actions/upload-artifact@v7
+        with:
+          name: sso-results-${{ github.sha }}
+          path: /tmp/oidc-sso.*/host/sso-results.json
+          if-no-files-found: error
+          retention-days: 7

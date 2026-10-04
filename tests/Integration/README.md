@@ -107,6 +107,14 @@ The upstream OP is pinned `oidc-provider 9.12.2`, with a real password check, fr
 
 The check first rejects a wrong password, then establishes a real upstream session. After wall time advances, a new downstream challenge deliberately uses upstream `prompt=none`: the newly signed assertion retains the previous event time, the package rejects it with 400, and code/token counts stay unchanged. Callback replay and unrelated state also fail. A new downstream challenge using upstream `prompt=login` requires credentials again; the independent RP verifies the resulting ID Token, exact upstream authentication time, and refresh preserving that time without nonce. Admin/Member session isolation is checked too.
 
+### Manual GitHub Actions run
+
+Once the workflow is available on the repository's default branch, open **Actions → Integration SSO → Run workflow** and select the ref to validate. It runs only on `workflow_dispatch`, independently of the seven-combination PHPUnit/Pest matrix. The Ubuntu job uses PHP 8.3, Laravel 13, Passport 13, Testbench 11, Pest 4, PHPUnit 12 and Node 22.x, with Redis, DOM and SQLite support. It has a 15-minute timeout, read-only repository permissions and requires no production credentials.
+
+The job invokes the same `run-sso.sh`, including its connection-failure exit-status control and the committed npm lockfile. A failed assertion or setup failure fails the job. Successful runs retain only the sanitized `sso-results.json` under the `sso-results-<commit SHA>` artifact for seven days; private keys, settings, sessions and token-bearing runtime files are not uploaded. The runner prints its private runtime path for local inspection. Check the run's commit and resolved dependencies when recording acceptance evidence.
+
+This workflow covers real upstream SSO, the independent RP and the scenarios described above. Cross-process fault injection, storage outage, rollback and forward recovery remain separate acceptance runs. A local runner pass does not establish a remote workflow pass; record remote acceptance only after an actual successful run.
+
 For interactive browser acceptance with the earlier manual fixture (which already installs both pinned Node dependencies), also start:
 
 ```sh

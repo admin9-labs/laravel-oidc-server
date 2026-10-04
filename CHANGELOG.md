@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- 2.0 requires explicit host authentication records for every authorization-code transaction, including requests without `openid`, and a host handler for challenge-bound reauthentication when needed. Authentication time is frozen in the code and preserved through refresh rotation.
+- Shared server-side sessions, session blocking and authoritative Redis atomic state are required. A Redis restart or promotion changes `run_id`, invalidating old freshness session state and outstanding code/refresh credentials, including previously issued refresh tokens. Affected clients must authorize again; Redis Cluster and other topologies require separate acceptance.
+- Package token endpoints support only authorization code, refresh token and client credentials. Password, device and custom user grants are rejected. Retained Passport authorization/token URLs, including custom prefixes with `ignore_passport_routes=false`, are protected package aliases; independent host OAuth requires its own controller, native server/response and envelope encryption key.
+- Old code/refresh formats are rejected with `invalid_grant`, with no conversion or compatibility refresh path. Format rejection and Redis state loss do not automatically revoke existing database token records or already issued access tokens. No package database migration is required; rollback must gate both new authorization and retries of unrevoked legacy refresh tokens.
+
+See the [English](docs/upgrading-to-2.0.0.md) / [中文](docs/zh-CN/upgrading-to-2.0.0.md) integration guides for host hooks, storage, coordinated cutover and rollback requirements. Local package checks and separate business-host acceptance are tracked in the [implementation evidence](docs/implementation-2.0.md).
+
+### Fixed
+
+- Return `invalid_request` for missing, blank or non-string refresh parameters while preserving client authentication precedence and `invalid_grant` for invalid credentials.
+- Verify the exact `consent_required` response, callback/state preservation and absence of new credentials during silent authorization requiring consent.
+- Update English/Chinese configuration guidance for authentication orchestration, retained routes, the freshness Redis connection and client credentials scope semantics.
+
+### Added
+
+- A manually triggered `Integration SSO` workflow using the existing real upstream SSO and independent RP runner, with sanitized result artifacts.
+
 ## [1.2.2] - 2026-09-24
 
 ### Security
