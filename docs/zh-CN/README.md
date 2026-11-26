@@ -14,7 +14,7 @@
 
 - PHP 8.2+
 - Laravel 11、12 或 13
-- Laravel Passport 12 或 13
+- Laravel Passport 12.x，或 13.7.1 及以上的 13.x 版本
 - 共享服务端 session、session blocking 和 Redis 原子状态
 
 支持组合：Laravel 11/12 + Passport 12/13 使用 PHP 8.2+；Laravel 13 + Passport 13 使用 PHP 8.3+。上游依赖不支持 Laravel 13 + Passport 12。参见[正式版范围及已知限制](../releasing-2.0.0.md)。

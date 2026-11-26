@@ -16,7 +16,7 @@ The [2.0 design](docs/authentication-freshness-2.0.md) defines the acceptance ga
 
 - PHP 8.2+
 - Laravel 11, 12, or 13
-- Laravel Passport 12 or 13
+- Laravel Passport 12.x or 13.x (13.7.1 and later)
 - Shared server-side sessions, session blocking, and shared Redis atomic state
 
 Supported combinations: Laravel 11/12 with Passport 12/13 on PHP 8.2+, and Laravel 13 with Passport 13 on PHP 8.3+. Laravel 13 with Passport 12 is not compatible with upstream requirements. See the [stable release scope and known limits](docs/releasing-2.0.0.md).

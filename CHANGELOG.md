@@ -5,6 +5,12 @@ All notable changes to `admin9/laravel-oidc-server` will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-11-26
+
+### Security
+
+- Require Passport 13.7.1 or later on the 13.x line to exclude versions affected by CVE-2026-39976. Passport 12.x remains supported. [Passport advisory](https://github.com/laravel/passport/security/advisories/GHSA-349c-2h2f-mxf6)
+
 ## [2.0.0] - 2026-10-04
 
 ### Changed
